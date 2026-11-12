@@ -1,0 +1,56 @@
+version: 2
+
+sources:
+  - name: raw_data
+    tables:
+      - name: raw_trips
+        description: "Raw ingested trip events (Bronze Tier)"
+        columns:
+          - name: event_id
+            tests:
+              - not_null
+              - unique
+          - name: pickup_datetime
+            tests:
+              - not_null
+          - name: pickup_location_id
+            tests:
+              - not_null
+          - name: fare_amount
+            tests:
+              - not_null
+
+models:
+  - name: stg_trips
+    description: "Cleaned and validated trip records (Silver Tier)"
+    columns:
+      - name: id
+        tests:
+          - not_null
+      - name: event_id
+        tests:
+          - not_null
+          - unique
+      - name: trip_duration_minutes
+        tests:
+          - not_null
+      - name: fare_amount
+        tests:
+          - not_null
+
+  - name: fct_hourly_demand
+    description: "Hourly aggregated demand metrics by zone (Gold Tier)"
+    columns:
+      - name: time_bucket
+        tests:
+          - not_null
+      - name: location_id
+        tests:
+          - not_null
+      - name: trip_count
+        tests:
+          - not_null
+      - name: total_revenue
+        tests:
+          - not_null
+

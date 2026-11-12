@@ -1,0 +1,89 @@
+[
+  {
+    "run_id": "exp-20261112-152832-LightGBM",
+    "timestamp": "2026-11-12T15:28:32.222418",
+    "model_name": "LightGBM_Forecaster",
+    "parameters": {
+      "n_estimators": 150,
+      "learning_rate": 0.05,
+      "max_depth": 6,
+      "features_count": 15
+    },
+    "metrics": {
+      "model_name": "LightGBM_Forecaster",
+      "mae": 2.7,
+      "rmse": 3.38,
+      "mape": 50.8,
+      "r2_score": -0.921,
+      "validation_method": "TimeSeriesSplit (3-Fold Walk-Forward, No Leakage)",
+      "train_samples": 183,
+      "test_samples": 60
+    },
+    "artifacts": {
+      "model_file": "C:\\Users\\yahya\\.gemini\\antigravity\\scratch\\flowsight\\backend\\app\\ml\\saved_models\\lightgbm_demand_forecaster.joblib"
+    },
+    "dataset_info": {
+      "total_records": 243,
+      "start_date": "2026-11-01 00:00:00",
+      "end_date": "2026-11-01 22:00:00"
+    }
+  },
+  {
+    "run_id": "exp-20261112-154502-LightGBM",
+    "timestamp": "2026-11-12T15:45:02.989940",
+    "model_name": "LightGBM_Forecaster",
+    "parameters": {
+      "n_estimators": 150,
+      "learning_rate": 0.05,
+      "max_depth": 6,
+      "features_count": 15
+    },
+    "metrics": {
+      "model_name": "LightGBM_Forecaster",
+      "mae": 2.66,
+      "rmse": 3.36,
+      "mape": 49.24,
+      "r2_score": -0.913,
+      "validation_method": "TimeSeriesSplit (3-Fold Walk-Forward, No Leakage)",
+      "train_samples": 183,
+      "test_samples": 60
+    },
+    "artifacts": {
+      "model_file": "C:\\Users\\yahya\\Desktop\\flowsight\\backend\\app\\ml\\saved_models\\lightgbm_demand_forecaster.joblib"
+    },
+    "dataset_info": {
+      "total_records": 243,
+      "start_date": "2026-11-01 00:00:00",
+      "end_date": "2026-11-01 22:00:00"
+    }
+  },
+  {
+    "run_id": "exp-20261112-165654-LightGBM",
+    "timestamp": "2026-11-12T16:56:54.917316",
+    "model_name": "LightGBM_Forecaster",
+    "parameters": {
+      "n_estimators": 150,
+      "learning_rate": 0.05,
+      "max_depth": 6,
+      "features_count": 15
+    },
+    "metrics": {
+      "model_name": "LightGBM_Forecaster",
+      "mae": 2.66,
+      "rmse": 3.36,
+      "mape": 49.24,
+      "r2_score": -0.913,
+      "validation_method": "TimeSeriesSplit (3-Fold Walk-Forward, No Leakage)",
+      "train_samples": 183,
+      "test_samples": 60
+    },
+    "artifacts": {
+      "model_file": "C:\\Users\\yahya\\Desktop\\flowsight\\backend\\app\\ml\\saved_models\\lightgbm_demand_forecaster.joblib"
+    },
+    "dataset_info": {
+      "total_records": 243,
+      "start_date": "2026-11-01 00:00:00",
+      "end_date": "2026-11-01 22:00:00"
+    }
+  }
+]

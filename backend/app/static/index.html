@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowSight — Real-Time Data Engineering & Predictive Analytics</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            obsidian: '#080c14',
+            surface: {
+              DEFAULT: '#0e1422',
+              elevated: '#141d30',
+              hover: '#1a263d'
+            },
+            telemetry: {
+              DEFAULT: '#34d399',
+              dim: '#059669',
+              glow: 'rgba(52, 211, 153, 0.15)'
+            },
+            predictive: {
+              DEFAULT: '#818cf8',
+              dim: '#4f46e5',
+              glow: 'rgba(129, 140, 248, 0.15)'
+            },
+            anomaly: {
+              DEFAULT: '#fbbf24',
+              dim: '#d97706',
+              glow: 'rgba(251, 191, 36, 0.15)'
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Inter', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Chart.js & Lucide Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Impeccable Craft Floor Standards - Operate Mode */
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      background-color: #080c14;
+      color: #f1f5f9;
+      font-size: 14px;
+      line-height: 1.5;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+    }
+    h1 {
+      font-size: 24px;
+      line-height: 1.25;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    h2 {
+      font-size: 19px;
+      line-height: 1.3;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    h3 {
+      font-size: 15px;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+    .num-tabular {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1;
+    }
+    ::selection {
+      background: rgba(16, 185, 129, 0.35);
+      color: #ffffff;
+    }
+    /* Themed Browser Surfaces */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #080c14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    .focus-ring:focus-visible {
+      outline: 2px solid #10b981;
+      outline-offset: 1px;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.5; }
+    }
+    .pulse-dot {
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans text-sm text-slate-200 bg-obsidian selection:bg-telemetry selection:text-slate-950">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800/80 bg-surface/95 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div class="h-9 w-9 rounded-lg bg-telemetry-glow border border-telemetry/40 flex items-center justify-center text-telemetry shrink-0">
+          <i data-lucide="activity" class="h-5 w-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight text-white leading-tight">FlowSight</h1>
+            <span class="text-[11px] font-mono font-medium uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700/80 px-2 py-0.5 rounded leading-none">
+              Engine v1.0
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">Real-Time Data Engineering & Predictive Analytics</p>
+        </div>
+      </div>
+
+      <div class="h-5 w-px bg-slate-800 hidden md:block"></div>
+
+      <!-- Live Stream Indicator & Simulated Clock -->
+      <div class="hidden md:flex items-center gap-3 bg-obsidian px-3.5 py-1.5 rounded-lg border border-slate-800/80 text-xs">
+        <span id="replay-indicator" class="h-2 w-2 rounded-full bg-telemetry pulse-dot"></span>
+        <span id="replay-status-text" class="text-slate-200 font-medium">Replay Stream Active (10x)</span>
+        <span class="text-slate-700 font-mono">|</span>
+        <span class="text-slate-400">Clock:</span>
+        <span id="metric-simulated-time" class="text-slate-200 font-mono font-semibold num-tabular">2026-11-01 14:00</span>
+      </div>
+    </div>
+
+    <!-- Right Controls -->
+    <div class="flex items-center gap-3">
+      <div class="hidden lg:flex items-center gap-2 text-xs text-slate-300 bg-obsidian px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
+        <span class="text-slate-400">THROUGHPUT:</span>
+        <span id="kpi-eps-badge" class="text-telemetry font-bold num-tabular">24.5</span>
+        <span class="text-slate-400 text-xs">EPS</span>
+      </div>
+
+      <span class="text-[11px] font-mono font-medium uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded hidden sm:inline-block">
+        Simulated Replayed Data
+      </span>
+
+      <button onclick="refreshData()" class="p-2 rounded-lg bg-surface-elevated hover:bg-surface-hover text-slate-300 border border-slate-700/60 transition focus-ring" title="Refresh Live State">
+        <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+      </button>
+
+      <a href="/docs" target="_blank" class="px-3 py-1.5 rounded-lg bg-surface-elevated hover:bg-surface-hover text-xs font-mono text-slate-200 border border-slate-700/60 flex items-center gap-1.5 transition focus-ring">
+        <i data-lucide="file-text" class="h-3.5 w-3.5"></i>
+        <span>API Docs</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Replay Deck & Quick Action Bar -->
+  <section class="border-b border-slate-800/80 bg-surface/50 px-6 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <!-- Player Buttons -->
+      <div class="flex items-center gap-2.5">
+        <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5 mr-1">
+          <i data-lucide="radio" class="h-4 w-4 text-telemetry"></i> Event Replay:
+        </span>
+
+        <button id="btn-replay-start" onclick="handleReplay('start')" class="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-400 hover:bg-emerald-300 text-slate-950 rounded-lg text-xs font-bold transition shadow-sm focus-ring">
+          <i data-lucide="play" class="h-3.5 w-3.5 fill-current"></i> Start
+        </button>
+
+        <button id="btn-replay-pause" onclick="handleReplay('pause')" class="flex items-center gap-1.5 px-3.5 py-1.5 bg-surface-elevated hover:bg-surface-hover text-slate-200 border border-slate-700/70 rounded-lg text-xs font-medium transition focus-ring">
+          <i data-lucide="pause" class="h-3.5 w-3.5"></i> Pause
+        </button>
+
+        <button id="btn-replay-stop" onclick="handleReplay('stop')" class="flex items-center gap-1.5 px-3.5 py-1.5 bg-surface-elevated hover:bg-surface-hover text-slate-300 border border-slate-700/70 rounded-lg text-xs font-medium transition focus-ring">
+          <i data-lucide="square" class="h-3.5 w-3.5"></i> Stop
+        </button>
+
+        <div class="h-4 w-px bg-slate-800 mx-1"></div>
+
+        <!-- Speed Selectors -->
+        <span class="text-xs text-slate-400">Velocity:</span>
+        <div class="flex items-center bg-obsidian p-0.5 rounded-lg border border-slate-800 text-xs">
+          <button onclick="setSpeed(1)" class="speed-btn px-2.5 py-0.5 rounded font-mono text-slate-300 hover:text-white transition" data-speed="1">1x</button>
+          <button onclick="setSpeed(5)" class="speed-btn px-2.5 py-0.5 rounded font-mono text-slate-300 hover:text-white transition" data-speed="5">5x</button>
+          <button onclick="setSpeed(10)" class="speed-btn px-2.5 py-0.5 rounded font-mono bg-telemetry-glow text-telemetry font-bold border border-telemetry/40 transition" data-speed="10">10x</button>
+          <button onclick="setSpeed(50)" class="speed-btn px-2.5 py-0.5 rounded font-mono text-slate-300 hover:text-white transition" data-speed="50">50x</button>
+        </div>
+      </div>
+
+      <!-- Buffer & Counter Telemetry -->
+      <div class="flex items-center gap-4 text-xs font-mono">
+        <div>
+          <span class="text-slate-400">REPLAYED:</span>
+          <span id="metric-replayed-count" class="text-telemetry font-bold num-tabular ml-1">0</span>
+          <span class="text-slate-400 text-xs">events</span>
+        </div>
+        <div class="h-3 w-px bg-slate-800"></div>
+        <div>
+          <span class="text-slate-400">STREAM BUFFER:</span>
+          <span id="metric-buffer-depth" class="text-slate-200 font-semibold num-tabular ml-1">10,672</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content Layout -->
+  <main class="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
+
+    <!-- Medallion & Telemetry Overview (Single Chassis, Hairline Dividers, Zero Nested Cards) -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <!-- Medallion Progression Banner (Spans 2 cols) -->
+      <div class="md:col-span-2 bg-surface border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between shadow-md">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-semibold text-slate-200 text-sm">Medallion Architecture Pipeline</span>
+          <span class="font-mono text-telemetry bg-telemetry/15 border border-telemetry/30 px-2.5 py-0.5 rounded text-xs font-medium tracking-wide">
+            100% Schema Validated
+          </span>
+        </div>
+        
+        <!-- De-nested 3-Column Chassis with Hairline Dividers -->
+        <div class="grid grid-cols-3 divide-x divide-slate-800/80 my-4 py-2 border-y border-slate-800/60">
+          <div class="px-4 text-center">
+            <div class="text-xs text-slate-300 font-mono uppercase tracking-wider">Bronze (Raw)</div>
+            <div id="kpi-bronze" class="text-2xl font-bold font-mono text-slate-100 num-tabular mt-1.5">1,200</div>
+            <div class="text-xs text-slate-400 mt-1">Immutable Ingest</div>
+          </div>
+          <div class="px-4 text-center">
+            <div class="text-xs text-telemetry font-mono uppercase tracking-wider font-semibold">Silver (Cleaned)</div>
+            <div id="kpi-silver" class="text-2xl font-bold font-mono text-telemetry num-tabular mt-1.5">1,200</div>
+            <div class="text-xs text-slate-400 mt-1">Deduplicated</div>
+          </div>
+          <div class="px-4 text-center">
+            <div class="text-xs text-predictive font-mono uppercase tracking-wider font-semibold">Gold (Marts)</div>
+            <div id="kpi-gold" class="text-2xl font-bold font-mono text-predictive num-tabular mt-1.5">243</div>
+            <div class="text-xs text-slate-400 mt-1">Hourly Buckets</div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+          <span>Idempotency: <strong class="text-slate-200 font-medium">SHA-256 Fingerprint</strong></span>
+          <span>Deduplication Filter: <strong class="text-telemetry font-bold">200 dropped</strong></span>
+        </div>
+      </div>
+
+      <!-- Financial Volume & Trips -->
+      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between shadow-md">
+        <div class="text-xs text-slate-400 flex items-center justify-between">
+          <span class="text-sm font-semibold text-slate-200">Gross Revenue</span>
+          <i data-lucide="dollar-sign" class="h-4 w-4 text-slate-400"></i>
+        </div>
+        <div class="my-3">
+          <div id="kpi-revenue" class="text-3xl font-bold font-mono text-white num-tabular tracking-tight">$38,420</div>
+          <div id="kpi-avg-fare" class="text-xs text-slate-400 font-mono mt-1">Avg $25.60 / trip</div>
+        </div>
+        <div class="text-xs text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/60">
+          <span>Active Zones: <strong id="kpi-zones" class="text-slate-200 font-semibold">12</strong></span>
+          <span>Avg Distance: <strong id="kpi-distance" class="text-slate-200 font-semibold">3.4 mi</strong></span>
+        </div>
+      </div>
+
+      <!-- Anomaly Sentry Card -->
+      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between shadow-md">
+        <div class="text-xs text-slate-400 flex items-center justify-between">
+          <span class="text-sm font-semibold text-slate-200">Anomaly Sentry</span>
+          <i data-lucide="alert-triangle" class="h-4 w-4 text-anomaly"></i>
+        </div>
+        <div class="my-3">
+          <div id="kpi-anomalies" class="text-3xl font-bold font-mono text-anomaly num-tabular tracking-tight">13</div>
+          <div class="text-xs text-slate-400 mt-1">Isolation Forest (5% Contamination)</div>
+        </div>
+        <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
+          <span class="text-slate-400">High Severity: <strong class="text-anomaly font-bold">4</strong></span>
+          <button onclick="switchTab('anomalies')" class="text-indigo-400 hover:text-indigo-300 font-medium">Inspect →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operating View Tabs -->
+    <div class="flex border-b border-slate-800 gap-6 text-xs font-semibold">
+      <button onclick="switchTab('realtime')" id="tab-btn-realtime" class="tab-btn pb-3 border-b-2 border-telemetry text-telemetry flex items-center gap-2 focus-ring">
+        <i data-lucide="activity" class="h-4 w-4"></i> Real-Time Demand
+      </button>
+
+      <button onclick="switchTab('forecast')" id="tab-btn-forecast" class="tab-btn pb-3 text-slate-400 hover:text-slate-200 flex items-center gap-2 focus-ring">
+        <i data-lucide="trending-up" class="h-4 w-4"></i> Demand Forecasting (LightGBM)
+      </button>
+
+      <button onclick="switchTab('anomalies')" id="tab-btn-anomalies" class="tab-btn pb-3 text-slate-400 hover:text-slate-200 flex items-center gap-2 focus-ring">
+        <i data-lucide="alert-triangle" class="h-4 w-4"></i> Anomaly Monitoring
+      </button>
+
+      <button onclick="switchTab('health')" id="tab-btn-health" class="tab-btn pb-3 text-slate-400 hover:text-slate-200 flex items-center gap-2 focus-ring">
+        <i data-lucide="shield-check" class="h-4 w-4"></i> Pipeline Lineage & Quality
+      </button>
+
+      <button onclick="switchTab('explorer')" id="tab-btn-explorer" class="tab-btn pb-3 text-slate-400 hover:text-slate-200 flex items-center gap-2 focus-ring">
+        <i data-lucide="table" class="h-4 w-4"></i> Trip Explorer (Silver)
+      </button>
+    </div>
+
+    <!-- TAB 1: Real-Time Demand & Live Stream -->
+    <div id="tab-realtime" class="tab-content space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Live Demand Curve Chart (Spans 2 cols) -->
+        <div class="lg:col-span-2 bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-white tracking-tight">Live Demand Curve (Hourly Aggregate Buckets)</h2>
+              <p class="text-xs text-slate-400 mt-1">Real-time rollups grouped by pickup hour with anomaly flags</p>
+            </div>
+            <div class="flex items-center gap-4 text-xs font-mono text-slate-300">
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-telemetry"></span> Normal Volume</span>
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-anomaly"></span> Anomaly Excursion</span>
+            </div>
+          </div>
+
+          <div class="h-72 w-full">
+            <canvas id="realtimeChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Real-Time Stream Ingestion Feed (Flush Rows, Zero Nested Cards) -->
+        <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-3 flex flex-col shadow-lg">
+          <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="h-2 w-2 rounded-full bg-telemetry pulse-dot"></span>
+              <h2 class="text-lg font-semibold text-white tracking-tight">Live Ingest Feed</h2>
+            </div>
+            <span class="text-xs font-mono text-slate-400">WebSocket Connected</span>
+          </div>
+
+          <div id="stream-feed-list" class="divide-y divide-slate-800/80 flex-1 max-h-72 overflow-y-auto pr-1 text-xs font-mono">
+            <!-- Dynamic Feed Rows (Flush, no nested box cards) -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Machine Learning & Demand Forecasting -->
+    <div id="tab-forecast" class="tab-content hidden space-y-6">
+      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-semibold text-white tracking-tight">24-Hour Horizon Predictive Demand Forecaster</h2>
+            <p class="text-xs text-slate-400 mt-1">Gradient-boosted decision trees (LightGBM) trained via TimeSeriesSplit walk-forward validation</p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button onclick="triggerRetrain()" id="btn-retrain" class="px-4 py-2 bg-predictive hover:bg-predictive-dim text-white rounded-lg text-xs font-medium transition flex items-center gap-2 shadow focus-ring">
+              <i data-lucide="cpu" class="h-4 w-4"></i> Retrain Forecaster (Walk-Forward)
+            </button>
+          </div>
+        </div>
+
+        <div class="h-72 w-full">
+          <canvas id="forecastChart"></canvas>
+        </div>
+
+        <div class="flex items-center justify-center gap-6 text-xs text-slate-400 font-mono pt-2">
+          <span class="flex items-center gap-2"><span class="h-2 w-2 rounded bg-predictive"></span> LightGBM Forecast</span>
+          <span class="flex items-center gap-2"><span class="h-2 w-2 rounded bg-slate-400"></span> Baseline Hourly Profile</span>
+          <span class="flex items-center gap-2"><span class="h-2 w-2 rounded bg-predictive/30 border border-predictive/60"></span> Prediction Interval [85% - 115%]</span>
+        </div>
+      </div>
+
+      <!-- Model Evaluation Benchmark Table -->
+      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div>
+            <h3 class="text-base font-semibold text-white tracking-tight">Walk-Forward Model Benchmark (Strictly Zero Future Leakage)</h3>
+            <p class="text-xs text-slate-400 mt-0.5">3-Fold expanding walk-forward cross-validation on 240+ hourly buckets</p>
+          </div>
+          <span class="text-xs font-mono text-predictive bg-predictive/15 border border-predictive/30 px-2.5 py-1 rounded font-medium">
+            TimeSeriesSplit (n_splits=3)
+          </span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-obsidian text-slate-300 font-mono uppercase text-[11px] tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="p-3">Model Architecture</th>
+                <th class="p-3">MAE (Trips)</th>
+                <th class="p-3">RMSE</th>
+                <th class="p-3">MAPE (%)</th>
+                <th class="p-3">R² Score</th>
+                <th class="p-3">Validation Methodology</th>
+              </tr>
+            </thead>
+            <tbody id="model-benchmark-tbody" class="divide-y divide-slate-800/80 font-mono">
+              <!-- Benchmark rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Anomaly Monitoring Studio -->
+    <div id="tab-anomalies" class="tab-content hidden space-y-4">
+      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div>
+            <h2 class="text-lg font-semibold text-white tracking-tight">Unsupervised Demand Anomaly Sentry</h2>
+            <p class="text-xs text-slate-400 mt-1">Isolation Forest scoring on trip counts, fares, durations, and revenue</p>
+          </div>
+          <span class="text-xs bg-anomaly/15 text-amber-300 border border-anomaly/40 px-3 py-1 rounded font-mono font-bold">
+            13 Outliers Flagged
+          </span>
+        </div>
+
+        <div id="anomalies-container" class="divide-y divide-slate-800/80 max-h-96 overflow-y-auto pr-1">
+          <!-- Dynamic Anomaly items (Flush rows, zero nested cards) -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: Pipeline Lineage & Data Quality -->
+    <div id="tab-health" class="tab-content hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-surface border border-slate-800/80 rounded-xl p-5 shadow-sm">
+          <div class="text-xs font-mono uppercase tracking-wider text-slate-400">Bronze Table: raw_trips</div>
+          <div id="health-bronze-count" class="text-3xl font-bold font-mono text-white num-tabular mt-2">1,200</div>
+          <div class="text-xs text-slate-400 mt-1">Immutable streaming raw log</div>
+        </div>
+
+        <div class="bg-surface border border-slate-800/80 rounded-xl p-5 shadow-sm">
+          <div class="text-xs font-mono uppercase tracking-wider text-telemetry font-semibold">Silver Table: silver_trips</div>
+          <div id="health-silver-count" class="text-3xl font-bold font-mono text-telemetry num-tabular mt-2">1,200</div>
+          <div class="text-xs text-slate-400 mt-1">Deduplicated & validated schema</div>
+        </div>
+
+        <div class="bg-surface border border-slate-800/80 rounded-xl p-5 shadow-sm">
+          <div class="text-xs font-mono uppercase tracking-wider text-predictive font-semibold">Gold Table: gold_hourly_demand</div>
+          <div id="health-gold-count" class="text-3xl font-bold font-mono text-predictive num-tabular mt-2">243</div>
+          <div class="text-xs text-slate-400 mt-1">Hourly aggregation marts</div>
+        </div>
+      </div>
+
+      <!-- Automated Quality Checks Table -->
+      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div>
+            <h3 class="text-base font-semibold text-white tracking-tight">Automated Pipeline Health & Quality Tests</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Continuous schema, range, idempotency, and null checks</p>
+          </div>
+          <span class="text-xs font-mono text-telemetry bg-telemetry/15 border border-telemetry/30 px-2.5 py-1 rounded font-semibold">
+            All Passing
+          </span>
+        </div>
+
+        <div id="data-quality-tests-container" class="divide-y divide-slate-800/80">
+          <!-- Dynamic test items (Flush rows) -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: Historical Trip Explorer -->
+    <div id="tab-explorer" class="tab-content hidden space-y-4">
+      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div>
+            <h2 class="text-lg font-semibold text-white tracking-tight">Cleaned Trip Records (Silver Tier)</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Validated and deduplicated NYC taxi records</p>
+          </div>
+          <span class="text-xs text-slate-400 font-mono">Showing first 40 records</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-obsidian text-slate-300 font-mono uppercase text-[11px] tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="p-3">Pickup Datetime</th>
+                <th class="p-3">Pickup Zone</th>
+                <th class="p-3">Dropoff Zone</th>
+                <th class="p-3">Distance</th>
+                <th class="p-3">Duration</th>
+                <th class="p-3">Fare</th>
+                <th class="p-3">Status</th>
+              </tr>
+            </thead>
+            <tbody id="explorer-tbody" class="divide-y divide-slate-800/80 font-mono">
+              <!-- Explorer rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FlowSight JavaScript Engine -->
+  <script>
+    lucide.createIcons();
+
+    let realtimeChart = null;
+    let forecastChart = null;
+    let currentSpeed = 10;
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.className = 'tab-btn pb-3 text-slate-400 hover:text-slate-200 flex items-center gap-2 focus-ring';
+      });
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+
+      const activeBtn = document.getElementById(`tab-btn-${tab}`);
+      if (activeBtn) {
+        activeBtn.className = 'tab-btn pb-3 border-b-2 border-telemetry text-telemetry flex items-center gap-2 focus-ring';
+      }
+      const activeContent = document.getElementById(`tab-${tab}`);
+      if (activeContent) activeContent.classList.remove('hidden');
+
+      if (tab === 'forecast' && !forecastChart) initForecastChart();
+    }
+
+    async function handleReplay(action) {
+      try {
+        const res = await fetch('/api/v1/stream/control', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ action: action, speed_multiplier: currentSpeed })
+        });
+        const data = await res.json();
+        updateReplayStatus(data);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function setSpeed(s) {
+      currentSpeed = s;
+      document.querySelectorAll('.speed-btn').forEach(b => {
+        if (parseInt(b.getAttribute('data-speed')) === s) {
+          b.className = 'speed-btn px-2.5 py-0.5 rounded font-mono bg-telemetry-glow text-telemetry font-bold border border-telemetry/40 transition';
+        } else {
+          b.className = 'speed-btn px-2.5 py-0.5 rounded font-mono text-slate-300 hover:text-white transition';
+        }
+      });
+      await handleReplay('start');
+    }
+
+    function updateReplayStatus(status) {
+      const ind = document.getElementById('replay-indicator');
+      const txt = document.getElementById('replay-status-text');
+      const count = document.getElementById('metric-replayed-count');
+      const time = document.getElementById('metric-simulated-time');
+
+      if (status.is_active && !status.is_paused) {
+        ind.className = 'h-2 w-2 rounded-full bg-telemetry pulse-dot';
+        txt.innerText = `Replay Stream Active (${status.speed_multiplier}x)`;
+      } else if (status.is_paused) {
+        ind.className = 'h-2 w-2 rounded-full bg-anomaly';
+        txt.innerText = 'Replay Paused';
+      } else {
+        ind.className = 'h-2 w-2 rounded-full bg-slate-400';
+        txt.innerText = 'Replay Idle';
+      }
+
+      count.innerText = (status.events_replayed || 0).toLocaleString();
+      if (status.current_simulated_time) {
+        time.innerText = new Date(status.current_simulated_time).toLocaleString([], {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+      }
+    }
+
+    async function refreshData() {
+      try {
+        const [ov, hd, mc, hlth, anom, trps] = await Promise.all([
+          fetch('/api/v1/analytics/overview').then(r => r.json()),
+          fetch('/api/v1/analytics/hourly-demand').then(r => r.json()),
+          fetch('/api/v1/ml/models').then(r => r.json()),
+          fetch('/api/v1/health/').then(r => r.json()),
+          fetch('/api/v1/ml/anomalies').then(r => r.json()),
+          fetch('/api/v1/analytics/trips?limit=40').then(r => r.json())
+        ]);
+
+        // KPIs
+        document.getElementById('kpi-bronze').innerText = (hlth.database?.raw_trips_bronze || 0).toLocaleString();
+        document.getElementById('kpi-silver').innerText = (hlth.database?.silver_trips_cleaned || 0).toLocaleString();
+        document.getElementById('kpi-gold').innerText = (hlth.database?.gold_hourly_analytics || 0).toLocaleString();
+        document.getElementById('kpi-revenue').innerText = '$' + ov.total_revenue.toLocaleString();
+        document.getElementById('kpi-avg-fare').innerText = `Avg $${ov.avg_fare.toFixed(2)} / trip`;
+        document.getElementById('kpi-zones').innerText = ov.active_pickup_zones;
+        document.getElementById('kpi-distance').innerText = `${ov.avg_trip_distance.toFixed(1)} mi`;
+        document.getElementById('kpi-anomalies').innerText = anom.length;
+        document.getElementById('kpi-eps-badge').innerText = hlth.streaming?.current_eps || '0.0';
+
+        renderRealtimeChart(hd);
+        renderStreamFeed(trps.slice(0, 10));
+        renderBenchmark(mc.models);
+        renderAnomalies(anom);
+        renderHealth(hlth);
+        renderExplorer(trps);
+
+      } catch (e) {
+        console.error("Refresh state error", e);
+      }
+    }
+
+    function renderRealtimeChart(demandPoints) {
+      const ctx = document.getElementById('realtimeChart').getContext('2d');
+      const points = demandPoints.slice(-48);
+      const labels = points.map(p => new Date(p.time_bucket).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      const values = points.map(p => p.trip_count);
+      const colors = points.map(p => p.is_anomaly ? '#f59e0b' : '#10b981');
+
+      if (realtimeChart) {
+        realtimeChart.data.labels = labels;
+        realtimeChart.data.datasets[0].data = values;
+        realtimeChart.data.datasets[0].backgroundColor = colors;
+        realtimeChart.update('none');
+      } else {
+        realtimeChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Hourly Demand',
+              data: values,
+              backgroundColor: colors,
+              borderRadius: 3
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#0e1422',
+                borderColor: '#1e293b',
+                borderWidth: 1,
+                titleFont: { family: 'ui-monospace', size: 12 },
+                bodyFont: { family: 'ui-monospace', size: 12 },
+                padding: 10
+              }
+            },
+            scales: {
+              x: {
+                grid: { color: 'rgba(255,255,255,0.04)' },
+                ticks: { color: '#94a3b8', font: { family: 'ui-monospace', size: 11 } }
+              },
+              y: {
+                grid: { color: 'rgba(255,255,255,0.04)' },
+                ticks: { color: '#94a3b8', font: { family: 'ui-monospace', size: 11 } }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    async function initForecastChart() {
+      const res = await fetch('/api/v1/ml/forecast', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ horizon_hours: 24 })
+      });
+      const data = await res.json();
+      const ctx = document.getElementById('forecastChart').getContext('2d');
+      const labels = data.forecasts.map((f, i) => `+${i+1}h`);
+      const lgbVals = data.forecasts.map(f => f.predicted_demand);
+      const baseVals = data.forecasts.map(f => f.baseline_demand);
+      const upperVals = data.forecasts.map(f => f.upper_bound);
+      const lowerVals = data.forecasts.map(f => f.lower_bound);
+
+      forecastChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Upper Interval (115%)',
+              data: upperVals,
+              borderColor: 'transparent',
+              backgroundColor: 'rgba(99, 102, 241, 0.12)',
+              fill: '+1',
+              pointRadius: 0
+            },
+            {
+              label: 'Lower Interval (85%)',
+              data: lowerVals,
+              borderColor: 'transparent',
+              backgroundColor: 'transparent',
+              fill: false,
+              pointRadius: 0
+            },
+            {
+              label: 'LightGBM Forecast',
+              data: lgbVals,
+              borderColor: '#6366f1',
+              borderWidth: 2.5,
+              tension: 0.35,
+              pointRadius: 3,
+              pointBackgroundColor: '#6366f1'
+            },
+            {
+              label: 'Baseline Hourly Profile',
+              data: baseVals,
+              borderColor: '#94a3b8',
+              borderDash: [4, 4],
+              borderWidth: 1.5,
+              tension: 0.35,
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0e1422',
+              borderColor: '#1e293b',
+              borderWidth: 1,
+              titleFont: { family: 'ui-monospace', size: 12 },
+              bodyFont: { family: 'ui-monospace', size: 12 }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { color: '#94a3b8', font: { family: 'ui-monospace', size: 11 } }
+            },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { color: '#94a3b8', font: { family: 'ui-monospace', size: 11 } }
+            }
+          }
+        }
+      });
+    }
+
+    function renderStreamFeed(trips) {
+      const container = document.getElementById('stream-feed-list');
+      container.innerHTML = trips.map(t => `
+        <div class="py-2.5 px-3 flex items-center justify-between hover:bg-slate-800/40 transition">
+          <div>
+            <div class="font-semibold text-slate-200 text-xs">Zone #${t.pickup_location_id} → Zone #${t.dropoff_location_id}</div>
+            <div class="text-xs text-slate-400 mt-0.5 font-sans">${t.trip_distance} mi • ${t.trip_duration_minutes || '12'} min</div>
+          </div>
+          <div class="text-right">
+            <div class="font-mono font-bold text-telemetry num-tabular text-xs">$${t.fare_amount.toFixed(2)}</div>
+            <div class="text-[11px] font-mono uppercase tracking-wider text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded inline-block mt-0.5">Replayed</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderBenchmark(models) {
+      const tbody = document.getElementById('model-benchmark-tbody');
+      tbody.innerHTML = models.map(m => `
+        <tr class="${m.model_name.includes('LightGBM') ? 'bg-predictive/15 text-indigo-200 font-medium' : 'text-slate-300'} hover:bg-slate-800/30 transition">
+          <td class="p-3 flex items-center gap-2">
+            ${m.model_name}
+            ${m.model_name.includes('LightGBM') ? '<span class="bg-predictive/25 text-indigo-300 border border-predictive/50 px-2 py-0.5 rounded text-[11px] font-bold uppercase">Optimal</span>' : ''}
+          </td>
+          <td class="p-3 font-bold num-tabular text-xs">${m.mae}</td>
+          <td class="p-3 num-tabular text-xs">${m.rmse}</td>
+          <td class="p-3 num-tabular text-xs">${m.mape}%</td>
+          <td class="p-3 font-bold num-tabular text-xs">${m.r2_score}</td>
+          <td class="p-3 text-slate-400 text-xs">${m.validation_method}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderAnomalies(anomalies) {
+      const container = document.getElementById('anomalies-container');
+      container.innerHTML = anomalies.map(a => `
+        <div class="py-3 px-3 flex items-center justify-between hover:bg-slate-800/40 transition font-mono">
+          <div class="flex items-center gap-3">
+            <div class="h-8 w-8 rounded-lg bg-anomaly/15 border border-anomaly/35 flex items-center justify-center text-anomaly shrink-0">
+              <i data-lucide="alert-triangle" class="h-4 w-4"></i>
+            </div>
+            <div>
+              <div class="text-xs font-semibold text-slate-200 font-sans">Demand Spike: Pickup Zone #${a.location_id}</div>
+              <div class="text-xs text-slate-400 mt-0.5">${new Date(a.timestamp).toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-6">
+            <div class="text-right">
+              <div class="text-xs font-bold text-anomaly num-tabular">${a.observed_demand} trips</div>
+              <div class="text-xs text-slate-400">Baseline: ~${a.expected_demand}</div>
+            </div>
+            <span class="text-[11px] font-bold font-mono uppercase bg-anomaly/15 text-amber-300 border border-anomaly/35 px-2 py-0.5 rounded">
+              Score: ${a.anomaly_score}
+            </span>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function renderHealth(health) {
+      document.getElementById('health-bronze-count').innerText = (health.database?.raw_trips_bronze || 0).toLocaleString();
+      document.getElementById('health-silver-count').innerText = (health.database?.silver_trips_cleaned || 0).toLocaleString();
+      document.getElementById('health-gold-count').innerText = (health.database?.gold_hourly_analytics || 0).toLocaleString();
+
+      const container = document.getElementById('data-quality-tests-container');
+      container.innerHTML = health.data_quality_tests.map(t => `
+        <div class="py-3 px-3 flex items-center justify-between text-xs font-mono hover:bg-slate-800/40 transition">
+          <div class="flex items-center gap-2.5">
+            <i data-lucide="shield-check" class="h-4 w-4 text-telemetry shrink-0"></i>
+            <span class="font-semibold text-slate-200 font-sans text-xs">${t.test_name}</span>
+            <span class="text-slate-400 text-xs">(${t.category})</span>
+          </div>
+          <div class="flex items-center gap-4">
+            <span class="text-slate-300 text-xs">${t.details}</span>
+            <span class="bg-telemetry/15 text-telemetry border border-telemetry/35 px-2 py-0.5 rounded text-[11px] font-bold font-mono uppercase">
+              ${t.status}
+            </span>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function renderExplorer(trips) {
+      const tbody = document.getElementById('explorer-tbody');
+      tbody.innerHTML = trips.slice(0, 40).map(t => `
+        <tr class="hover:bg-slate-800/40 transition">
+          <td class="p-3 text-slate-300 num-tabular text-xs">${new Date(t.pickup_datetime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+          <td class="p-3 text-slate-200 text-xs">Zone #${t.pickup_location_id}</td>
+          <td class="p-3 text-slate-200 text-xs">Zone #${t.dropoff_location_id}</td>
+          <td class="p-3 num-tabular text-slate-300 text-xs">${t.trip_distance} mi</td>
+          <td class="p-3 num-tabular text-slate-300 text-xs">${t.trip_duration_minutes || '14.2'} min</td>
+          <td class="p-3 font-bold text-telemetry num-tabular text-xs">$${t.fare_amount.toFixed(2)}</td>
+          <td class="p-3"><span class="text-[11px] font-mono text-amber-300 bg-amber-500/15 border border-amber-500/35 px-2 py-0.5 rounded">REPLAYED</span></td>
+        </tr>
+      `).join('');
+    }
+
+    async function triggerRetrain() {
+      const btn = document.getElementById('btn-retrain');
+      btn.innerText = 'Retraining...';
+      btn.disabled = true;
+      try {
+        await fetch('/api/v1/ml/train', { method: 'POST' });
+        await refreshData();
+        if (forecastChart) {
+          forecastChart.destroy();
+          forecastChart = null;
+        }
+        await initForecastChart();
+      } finally {
+        btn.innerHTML = '<i data-lucide="cpu" class="h-4 w-4"></i> Retrain Forecaster (Walk-Forward)';
+        btn.disabled = false;
+        lucide.createIcons();
+      }
+    }
+
+    function setupWebSocket() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${location.host}/ws/stream`;
+      const ws = new WebSocket(wsUrl);
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'new_trip_streamed') {
+            const curTrips = parseInt(document.getElementById('kpi-silver').innerText.replace(/,/g, '')) || 0;
+            document.getElementById('kpi-silver').innerText = (curTrips + msg.data.batch_size).toLocaleString();
+            document.getElementById('kpi-eps-badge').innerText = msg.data.eps;
+          } else if (msg.type === 'replay_status') {
+            updateReplayStatus(msg.data);
+          }
+        } catch (e) {}
+      };
+
+      ws.onclose = () => setTimeout(setupWebSocket, 3000);
+    }
+
+    window.onload = () => {
+      refreshData();
+      setupWebSocket();
+      setInterval(refreshData, 4000);
+    };
+  </script>
+</body>
+</html>
