@@ -13,7 +13,7 @@ import {
   connectStreamWebSocket
 } from "@/lib/api";
 
-type ThemeId = "aurora" | "cyber" | "enterprise";
+type ThemeId = "aurora" | "cyber" | "enterprise" | "waybill";
 
 export default function FlowSightDashboard() {
   const [theme, setTheme] = useState<ThemeId>("cyber");
@@ -29,12 +29,13 @@ export default function FlowSightDashboard() {
   const [speedMultiplier, setSpeedMultiplier] = useState(10);
   const [isTraining, setIsTraining] = useState(false);
 
-  // Keyboard shortcut listener (1, 2, 3 for instant switching)
+  // Keyboard shortcut listener (1, 2, 3, 4 for instant switching)
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "1") setTheme("aurora");
       if (e.key === "2") setTheme("cyber");
       if (e.key === "3") setTheme("enterprise");
+      if (e.key === "4") setTheme("waybill");
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -105,13 +106,15 @@ export default function FlowSightDashboard() {
   const themeBg = {
     aurora: "bg-[#05050A] text-slate-100",
     cyber: "bg-[#03070C] font-mono text-slate-200",
-    enterprise: "bg-[#0B1120] text-slate-100"
+    enterprise: "bg-[#0B1120] text-slate-100",
+    waybill: "bg-[#1730A8] text-[#0b0d17]"
   }[theme];
 
   const cardStyle = {
     aurora: "bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_40px_-15px_rgba(0,0,0,0.7)]",
     cyber: "bg-[#070E17]/95 border border-[#162638] border-l-2 border-l-[#06B6D4] rounded-none p-5 relative",
-    enterprise: "bg-[#111827] border border-slate-800 rounded-xl p-5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+    enterprise: "bg-[#111827] border border-slate-800 rounded-xl p-5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]",
+    waybill: "bg-[#FBFCFF] border-2 border-[#0B0D17] rounded-md p-5 shadow-[4px_4px_0px_#0B0D17]"
   }[theme];
 
   return (
@@ -188,6 +191,16 @@ export default function FlowSightDashboard() {
             }`}
           >
             <span>☁</span> Sample 3: Enterprise Cloud
+          </button>
+          <button
+            onClick={() => setTheme("waybill")}
+            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
+              theme === "waybill"
+                ? "bg-amber-400 text-slate-950 border border-slate-950 shadow-sm"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <span>📦</span> Sample 4: Waybill (GitHub)
           </button>
         </div>
 
@@ -489,6 +502,16 @@ export default function FlowSightDashboard() {
           }`}
         >
           <span className="text-sky-400">☁</span> Enterprise Cloud
+        </button>
+        <button
+          onClick={() => setTheme("waybill")}
+          className={`px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1.5 ${
+            theme === "waybill"
+              ? "bg-amber-400 text-slate-950 border border-slate-950 shadow-sm font-semibold"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <span className="text-yellow-300">📦</span> Waybill (GitHub)
         </button>
       </div>
     </div>

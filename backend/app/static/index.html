@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FlowSight — Real-Time Data Engineering & Predictive Analytics</title>
   
-  <!-- Fonts -->
+  <!-- Fonts (Including Yahya's Waybill Archivo, B612 Mono, Libre Barcode) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,600..900&family=B612+Mono:ital,wght@0,400;0,700;1,400&family=Libre+Barcode+39+Text&family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -240,6 +240,67 @@
       stroke-dasharray: 6 6;
       animation: medallionFlow 0.9s linear infinite;
     }
+
+    /* =========================================================
+       CARBON SYNTHESIS: SAMPLE 4 (WAYBILL & COURIER TRANSIT)
+       Inspired by Yahya's GitHub: YahyaLendani.github.io & SpectraCode
+       ========================================================= */
+    [data-theme="waybill"] body {
+      background-color: #1730a8;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(31, 63, 214, 0.95) 0%, #1730a8 100%),
+        linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+      background-size: 100% 100%, 24px 24px, 24px 24px;
+      font-family: 'Archivo', 'Inter', sans-serif;
+      color: #0b0d17;
+    }
+    [data-theme="waybill"] .theme-card {
+      background: #fbfcff;
+      border: 2px solid #0b0d17;
+      border-radius: 6px;
+      box-shadow: 4px 4px 0px #0b0d17;
+      color: #0b0d17;
+      position: relative;
+    }
+    [data-theme="waybill"] .theme-card:hover {
+      box-shadow: 6px 6px 0px #0b0d17;
+      transform: translate(-1px, -1px);
+    }
+    [data-theme="waybill"] .theme-card .text-white,
+    [data-theme="waybill"] .theme-card .text-slate-100,
+    [data-theme="waybill"] .theme-card .text-slate-200 {
+      color: #0b0d17 !important;
+    }
+    [data-theme="waybill"] .theme-card .text-slate-300,
+    [data-theme="waybill"] .theme-card .text-slate-400 {
+      color: #3a4060 !important;
+    }
+    [data-theme="waybill"] .theme-header {
+      background: #112282;
+      border-bottom: 2px solid #0b0d17;
+      color: #fbfcff;
+    }
+    [data-theme="waybill"] .theme-accent-badge {
+      background: #e6ff3d;
+      border: 1.5px solid #0b0d17;
+      color: #0b0d17;
+      font-family: '"B612 Mono"', monospace;
+      font-weight: 700;
+    }
+    [data-theme="waybill"] .waybill-barcode-hero {
+      display: inline-block;
+      font-family: 'Libre Barcode 39 Text', cursive;
+      font-size: 32px;
+      line-height: 1;
+      color: #e6ff3d;
+      user-select: none;
+      letter-spacing: 0.05em;
+    }
+    [data-theme="waybill"] .num-tabular {
+      font-family: '"B612 Mono"', monospace;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col font-sans text-sm selection:bg-telemetry selection:text-slate-950 pb-20">
@@ -257,8 +318,9 @@
             <span class="text-[11px] font-mono font-medium uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700/80 px-2 py-0.5 rounded leading-none">
               v1.2 Stream
             </span>
+            <span class="waybill-barcode-hero hidden md:inline ml-2">*FLOWSIGHT-NYC-TLC*</span>
           </div>
-          <p class="text-xs text-slate-400 mt-0.5">Real-Time Data Engineering & Predictive Analytics</p>
+          <p class="text-xs text-slate-400 mt-0.5" style="text-wrap: balance;">Real-Time Data Engineering & Predictive&nbsp;Analytics</p>
         </div>
       </div>
 
@@ -277,16 +339,19 @@
     <!-- Center: Interactive Design Sample Switcher Pill -->
     <div class="hidden lg:flex items-center bg-obsidian/90 border border-slate-700/80 p-1 rounded-xl gap-1 text-xs shadow-inner">
       <span class="text-slate-400 font-medium px-2 flex items-center gap-1.5">
-        <i data-lucide="sparkles" class="h-3.5 w-3.5 text-indigo-400"></i> Modern Samples:
+        <i data-lucide="sparkles" class="h-3.5 w-3.5 text-indigo-400"></i> Samples:
       </span>
-      <button onclick="setTheme('aurora')" id="btn-theme-aurora" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm" title="Press 1 on keyboard">
-        <span>✦</span> Sample 1: Aurora (Linear)
+      <button onclick="setTheme('aurora')" id="btn-theme-aurora" class="px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" title="Press 1 on keyboard">
+        <span>✦</span> Aurora (Linear)
       </button>
-      <button onclick="setTheme('cyber')" id="btn-theme-cyber" class="px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" title="Press 2 on keyboard">
-        <span>⚡</span> Sample 2: Mission Control (Datadog)
+      <button onclick="setTheme('cyber')" id="btn-theme-cyber" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm" title="Press 2 on keyboard">
+        <span>⚡</span> Mission Control
       </button>
       <button onclick="setTheme('enterprise')" id="btn-theme-enterprise" class="px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" title="Press 3 on keyboard">
-        <span>☁</span> Sample 3: Enterprise Cloud (Stripe)
+        <span>☁</span> Enterprise Cloud
+      </button>
+      <button onclick="setTheme('waybill')" id="btn-theme-waybill" class="px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" title="Press 4 on keyboard">
+        <span>📦</span> Waybill & Transit (GitHub)
       </button>
     </div>
 
@@ -319,9 +384,10 @@
       <i data-lucide="sparkles" class="h-3.5 w-3.5 text-indigo-400"></i> Samples:
     </span>
     <div class="flex items-center gap-2 shrink-0">
-      <button onclick="setTheme('aurora')" class="px-2.5 py-1 rounded-md text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-medium">1. Aurora</button>
-      <button onclick="setTheme('cyber')" class="px-2.5 py-1 rounded-md text-xs text-slate-400 hover:text-white border border-slate-800">2. Mission Control</button>
+      <button onclick="setTheme('aurora')" class="px-2.5 py-1 rounded-md text-xs text-slate-400 hover:text-white border border-slate-800">1. Aurora</button>
+      <button onclick="setTheme('cyber')" class="px-2.5 py-1 rounded-md text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-medium">2. Mission Control</button>
       <button onclick="setTheme('enterprise')" class="px-2.5 py-1 rounded-md text-xs text-slate-400 hover:text-white border border-slate-800">3. Enterprise Cloud</button>
+      <button onclick="setTheme('waybill')" class="px-2.5 py-1 rounded-md text-xs text-slate-400 hover:text-white border border-slate-800">4. Waybill</button>
     </div>
   </div>
 
@@ -680,6 +746,9 @@
     <button onclick="setTheme('enterprise')" id="dock-btn-enterprise" class="px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200">
       <span class="text-sky-400">☁</span> Enterprise Cloud
     </button>
+    <button onclick="setTheme('waybill')" id="dock-btn-waybill" class="px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200">
+      <span class="text-yellow-300">📦</span> Waybill (GitHub)
+    </button>
   </div>
 
   <!-- FlowSight JavaScript Engine with Live Multi-Sample Switcher -->
@@ -696,7 +765,7 @@
       localStorage.setItem('flowsight_theme', theme);
 
       // Update button active states in Header & Floating Dock
-      ['aurora', 'cyber', 'enterprise'].forEach(t => {
+      ['aurora', 'cyber', 'enterprise', 'waybill'].forEach(t => {
         const topBtn = document.getElementById(`btn-theme-${t}`);
         const dockBtn = document.getElementById(`dock-btn-${t}`);
         const isActive = (t === theme);
@@ -717,11 +786,12 @@
       if (realtimeChart) realtimeChart.update('none');
     }
 
-    // Keyboard Shortcuts: Press 1, 2, 3 to switch samples instantly!
+    // Keyboard Shortcuts: Press 1, 2, 3, 4 to switch samples instantly!
     window.addEventListener('keydown', (e) => {
       if (e.key === '1') setTheme('aurora');
       if (e.key === '2') setTheme('cyber');
       if (e.key === '3') setTheme('enterprise');
+      if (e.key === '4') setTheme('waybill');
     });
 
     // Load saved theme (Default to Cybernetic Mission Control)
