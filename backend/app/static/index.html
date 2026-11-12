@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark" data-theme="aurora">
+<html lang="en" class="dark" data-theme="cyber">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -159,12 +159,8 @@
        CARBON SPECIFICATION: SAMPLE 2 (CYBERNETIC MISSION CONTROL)
        ========================================================= */
     [data-theme="cyber"] body {
-      background-color: #03070C;
-      background-image:
-        linear-gradient(to right, rgba(6, 182, 212, 0.06) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(6, 182, 212, 0.06) 1px, transparent 1px),
-        radial-gradient(circle, rgba(6, 182, 212, 0.18) 1px, transparent 1px);
-      background-size: 24px 24px, 24px 24px, 24px 24px;
+      background-color: #03070c;
+      background-image: radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.08) 0%, transparent 60%);
       font-family: '"JetBrains Mono"', monospace;
       color: #e2e8f0;
     }
@@ -728,8 +724,8 @@
       if (e.key === '3') setTheme('enterprise');
     });
 
-    // Load saved theme (Default to Aurora)
-    const savedTheme = localStorage.getItem('flowsight_theme') || 'aurora';
+    // Load saved theme (Default to Cybernetic Mission Control)
+    const savedTheme = localStorage.getItem('flowsight_theme') || 'cyber';
     setTheme(savedTheme);
 
     function switchTab(tab) {

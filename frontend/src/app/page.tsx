@@ -16,7 +16,7 @@ import {
 type ThemeId = "aurora" | "cyber" | "enterprise";
 
 export default function FlowSightDashboard() {
-  const [theme, setTheme] = useState<ThemeId>("aurora");
+  const [theme, setTheme] = useState<ThemeId>("cyber");
   const [activeTab, setActiveTab] = useState<"realtime" | "forecast" | "anomalies" | "health" | "explorer">("realtime");
   const [overview, setOverview] = useState<any>(null);
   const [replayStatus, setReplayStatus] = useState<any>({ is_active: false, speed_multiplier: 10 });
