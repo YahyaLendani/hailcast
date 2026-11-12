@@ -1,10 +1,15 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark" data-theme="aurora">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FlowSight — Real-Time Data Engineering & Predictive Analytics</title>
   
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -13,9 +18,9 @@
       theme: {
         extend: {
           colors: {
-            obsidian: '#080c14',
+            obsidian: '#05050a',
             surface: {
-              DEFAULT: '#0e1422',
+              DEFAULT: '#0d1322',
               elevated: '#141d30',
               hover: '#1a263d'
             },
@@ -36,8 +41,8 @@
             }
           },
           fontFamily: {
-            sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Inter', 'sans-serif'],
-            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', '"Fira Code"', 'ui-monospace', 'monospace']
           }
         }
       }
@@ -49,18 +54,18 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
-    /* Impeccable Craft Floor Standards - Operate Mode */
     :root {
       color-scheme: dark;
     }
     body {
-      background-color: #080c14;
-      color: #f1f5f9;
       font-size: 14px;
       line-height: 1.5;
       font-feature-settings: "cv02", "cv03", "cv04", "cv11";
       -webkit-font-smoothing: antialiased;
+      transition: background-color 0.3s ease, color 0.3s ease;
     }
+
+    /* Major Third Typographic Ramp (>= 1.25x) */
     h1 {
       font-size: 24px;
       line-height: 1.25;
@@ -78,21 +83,23 @@
       line-height: 1.4;
       font-weight: 600;
     }
+
     .num-tabular {
       font-variant-numeric: tabular-nums;
       font-feature-settings: "tnum" 1;
     }
     ::selection {
-      background: rgba(16, 185, 129, 0.35);
+      background: rgba(52, 211, 153, 0.35);
       color: #ffffff;
     }
-    /* Themed Browser Surfaces */
+
+    /* Themed Scrollbars */
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
     ::-webkit-scrollbar-track {
-      background: #080c14;
+      background: transparent;
     }
     ::-webkit-scrollbar-thumb {
       background: #1e293b;
@@ -102,7 +109,7 @@
       background: #334155;
     }
     .focus-ring:focus-visible {
-      outline: 2px solid #10b981;
+      outline: 2px solid #34d399;
       outline-offset: 1px;
     }
     @keyframes pulse-dot {
@@ -112,12 +119,137 @@
     .pulse-dot {
       animation: pulse-dot 2s ease-in-out infinite;
     }
+
+    /* =========================================================
+       CARBON SPECIFICATION: SAMPLE 1 (AURORA GLOW / LINEAR SAAS)
+       ========================================================= */
+    [data-theme="aurora"] body {
+      background-color: #05050A;
+      background-image:
+        radial-gradient(55% 45% at 18% -5%, rgba(99, 102, 241, 0.20), transparent 70%),
+        radial-gradient(45% 40% at 82% 0%, rgba(16, 185, 129, 0.15), transparent 70%),
+        radial-gradient(50% 50% at 50% 90%, rgba(129, 140, 248, 0.08), transparent 75%);
+      background-attachment: fixed;
+      font-family: 'Inter', system-ui, sans-serif;
+      color: #f1f5f9;
+    }
+    [data-theme="aurora"] .theme-card {
+      background: rgba(14, 20, 34, 0.75);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 1rem;
+      box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+      transition: all 0.2s ease;
+    }
+    [data-theme="aurora"] .theme-card:hover {
+      border-color: rgba(129, 140, 248, 0.35);
+    }
+    [data-theme="aurora"] .theme-header {
+      background: rgba(10, 15, 26, 0.85);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+    }
+    [data-theme="aurora"] .theme-accent-badge {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(52, 211, 153, 0.2));
+      border: 1px solid rgba(129, 140, 248, 0.4);
+      color: #c7d2fe;
+    }
+
+    /* =========================================================
+       CARBON SPECIFICATION: SAMPLE 2 (CYBERNETIC MISSION CONTROL)
+       ========================================================= */
+    [data-theme="cyber"] body {
+      background-color: #03070C;
+      background-image:
+        linear-gradient(to right, rgba(6, 182, 212, 0.06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(6, 182, 212, 0.06) 1px, transparent 1px),
+        radial-gradient(circle, rgba(6, 182, 212, 0.18) 1px, transparent 1px);
+      background-size: 24px 24px, 24px 24px, 24px 24px;
+      font-family: '"JetBrains Mono"', monospace;
+      color: #e2e8f0;
+    }
+    [data-theme="cyber"] .theme-card {
+      background: #070e17;
+      border: 1px solid #162638;
+      border-left: 2px solid #06b6d4;
+      border-radius: 0;
+      box-shadow: none;
+      position: relative;
+    }
+    /* Tactical Crosshair Reticles */
+    [data-theme="cyber"] .cyber-reticle::before,
+    [data-theme="cyber"] .cyber-reticle::after {
+      content: "";
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      pointer-events: none;
+      border-color: #06b6d4;
+    }
+    [data-theme="cyber"] .cyber-reticle::before {
+      top: -1px; left: -1px;
+      border-top: 2px solid #06b6d4; border-left: 2px solid #06b6d4;
+    }
+    [data-theme="cyber"] .cyber-reticle::after {
+      bottom: -1px; right: -1px;
+      border-bottom: 2px solid #06b6d4; border-right: 2px solid #06b6d4;
+    }
+    [data-theme="cyber"] .theme-card:hover {
+      border-color: #06b6d4;
+    }
+    [data-theme="cyber"] .theme-header {
+      background: #050a12;
+      border-bottom: 1px solid #162638;
+    }
+    [data-theme="cyber"] .theme-accent-badge {
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      color: #67e8f9;
+      font-family: '"JetBrains Mono"', monospace;
+    }
+
+    /* =========================================================
+       CARBON SPECIFICATION: SAMPLE 3 (ENTERPRISE DATA CLOUD)
+       ========================================================= */
+    [data-theme="enterprise"] body {
+      background-color: #0b1120;
+      background-image: none;
+      font-family: '"Plus Jakarta Sans"', 'Inter', sans-serif;
+      color: #f8fafc;
+    }
+    [data-theme="enterprise"] .theme-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 0.75rem;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+      transition: all 0.2s ease;
+    }
+    [data-theme="enterprise"] .theme-card:hover {
+      border-color: #38bdf8;
+    }
+    [data-theme="enterprise"] .theme-header {
+      background: #0f172a;
+      border-bottom: 1px solid #1e293b;
+    }
+    [data-theme="enterprise"] .theme-accent-badge {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #7dd3fc;
+    }
+    /* Flow Connector Animation */
+    @keyframes medallionFlow {
+      to { stroke-dashoffset: -24; }
+    }
+    .animate-flow-line {
+      stroke-dasharray: 6 6;
+      animation: medallionFlow 0.9s linear infinite;
+    }
   </style>
 </head>
-<body class="min-h-screen flex flex-col font-sans text-sm text-slate-200 bg-obsidian selection:bg-telemetry selection:text-slate-950">
+<body class="min-h-screen flex flex-col font-sans text-sm selection:bg-telemetry selection:text-slate-950 pb-20">
 
   <!-- Header -->
-  <header class="border-b border-slate-800/80 bg-surface/95 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+  <header class="theme-header sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between transition-colors">
     <div class="flex items-center gap-4">
       <div class="flex items-center gap-3">
         <div class="h-9 w-9 rounded-lg bg-telemetry-glow border border-telemetry/40 flex items-center justify-center text-telemetry shrink-0">
@@ -127,7 +259,7 @@
           <div class="flex items-center gap-2">
             <h1 class="text-xl font-bold tracking-tight text-white leading-tight">FlowSight</h1>
             <span class="text-[11px] font-mono font-medium uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700/80 px-2 py-0.5 rounded leading-none">
-              Engine v1.0
+              v1.2 Stream
             </span>
           </div>
           <p class="text-xs text-slate-400 mt-0.5">Real-Time Data Engineering & Predictive Analytics</p>
@@ -146,16 +278,32 @@
       </div>
     </div>
 
+    <!-- Center: Interactive Design Sample Switcher Pill -->
+    <div class="hidden lg:flex items-center bg-obsidian/90 border border-slate-700/80 p-1 rounded-xl gap-1 text-xs shadow-inner">
+      <span class="text-slate-400 font-medium px-2 flex items-center gap-1.5">
+        <i data-lucide="sparkles" class="h-3.5 w-3.5 text-indigo-400"></i> Modern Samples:
+      </span>
+      <button onclick="setTheme('aurora')" id="btn-theme-aurora" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm" title="Press 1 on keyboard">
+        <span>✦</span> Sample 1: Aurora (Linear)
+      </button>
+      <button onclick="setTheme('cyber')" id="btn-theme-cyber" class="px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" title="Press 2 on keyboard">
+        <span>⚡</span> Sample 2: Mission Control (Datadog)
+      </button>
+      <button onclick="setTheme('enterprise')" id="btn-theme-enterprise" class="px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" title="Press 3 on keyboard">
+        <span>☁</span> Sample 3: Enterprise Cloud (Stripe)
+      </button>
+    </div>
+
     <!-- Right Controls -->
     <div class="flex items-center gap-3">
-      <div class="hidden lg:flex items-center gap-2 text-xs text-slate-300 bg-obsidian px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
+      <div class="hidden xl:flex items-center gap-2 text-xs text-slate-300 bg-obsidian px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
         <span class="text-slate-400">THROUGHPUT:</span>
         <span id="kpi-eps-badge" class="text-telemetry font-bold num-tabular">24.5</span>
         <span class="text-slate-400 text-xs">EPS</span>
       </div>
 
       <span class="text-[11px] font-mono font-medium uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded hidden sm:inline-block">
-        Simulated Replayed Data
+        Simulated Replay
       </span>
 
       <button onclick="refreshData()" class="p-2 rounded-lg bg-surface-elevated hover:bg-surface-hover text-slate-300 border border-slate-700/60 transition focus-ring" title="Refresh Live State">
@@ -168,6 +316,18 @@
       </a>
     </div>
   </header>
+
+  <!-- Mobile/Tablet Sample Switcher (Compact) -->
+  <div class="lg:hidden bg-obsidian border-b border-slate-800 px-6 py-2.5 flex items-center justify-between text-xs overflow-x-auto gap-2">
+    <span class="text-slate-400 font-medium shrink-0 flex items-center gap-1">
+      <i data-lucide="sparkles" class="h-3.5 w-3.5 text-indigo-400"></i> Samples:
+    </span>
+    <div class="flex items-center gap-2 shrink-0">
+      <button onclick="setTheme('aurora')" class="px-2.5 py-1 rounded-md text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-medium">1. Aurora</button>
+      <button onclick="setTheme('cyber')" class="px-2.5 py-1 rounded-md text-xs text-slate-400 hover:text-white border border-slate-800">2. Mission Control</button>
+      <button onclick="setTheme('enterprise')" class="px-2.5 py-1 rounded-md text-xs text-slate-400 hover:text-white border border-slate-800">3. Enterprise Cloud</button>
+    </div>
+  </div>
 
   <!-- Replay Deck & Quick Action Bar -->
   <section class="border-b border-slate-800/80 bg-surface/50 px-6 py-3">
@@ -221,13 +381,16 @@
   <!-- Main Content Layout -->
   <main class="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
 
-    <!-- Medallion & Telemetry Overview (Single Chassis, Hairline Dividers, Zero Nested Cards) -->
+    <!-- Medallion & Telemetry Overview -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <!-- Medallion Progression Banner (Spans 2 cols) -->
-      <div class="md:col-span-2 bg-surface border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between shadow-md">
+      <div class="md:col-span-2 theme-card cyber-reticle p-5 flex flex-col justify-between">
         <div class="flex items-center justify-between text-xs">
-          <span class="font-semibold text-slate-200 text-sm">Medallion Architecture Pipeline</span>
-          <span class="font-mono text-telemetry bg-telemetry/15 border border-telemetry/30 px-2.5 py-0.5 rounded text-xs font-medium tracking-wide">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-slate-200 text-sm">Medallion Architecture Pipeline</span>
+            <span class="h-1.5 w-1.5 rounded-full bg-telemetry pulse-dot"></span>
+          </div>
+          <span class="theme-accent-badge font-mono px-2.5 py-0.5 rounded text-xs font-medium tracking-wide">
             100% Schema Validated
           </span>
         </div>
@@ -235,17 +398,17 @@
         <!-- De-nested 3-Column Chassis with Hairline Dividers -->
         <div class="grid grid-cols-3 divide-x divide-slate-800/80 my-4 py-2 border-y border-slate-800/60">
           <div class="px-4 text-center">
-            <div class="text-xs text-slate-300 font-mono uppercase tracking-wider">Bronze (Raw)</div>
+            <div class="text-xs text-amber-400 font-mono uppercase tracking-wider">Bronze (Raw)</div>
             <div id="kpi-bronze" class="text-2xl font-bold font-mono text-slate-100 num-tabular mt-1.5">1,200</div>
             <div class="text-xs text-slate-400 mt-1">Immutable Ingest</div>
           </div>
           <div class="px-4 text-center">
-            <div class="text-xs text-telemetry font-mono uppercase tracking-wider font-semibold">Silver (Cleaned)</div>
+            <div class="text-xs text-slate-300 font-mono uppercase tracking-wider font-semibold">Silver (Cleaned)</div>
             <div id="kpi-silver" class="text-2xl font-bold font-mono text-telemetry num-tabular mt-1.5">1,200</div>
             <div class="text-xs text-slate-400 mt-1">Deduplicated</div>
           </div>
           <div class="px-4 text-center">
-            <div class="text-xs text-predictive font-mono uppercase tracking-wider font-semibold">Gold (Marts)</div>
+            <div class="text-xs text-indigo-400 font-mono uppercase tracking-wider font-semibold">Gold (Marts)</div>
             <div id="kpi-gold" class="text-2xl font-bold font-mono text-predictive num-tabular mt-1.5">243</div>
             <div class="text-xs text-slate-400 mt-1">Hourly Buckets</div>
           </div>
@@ -258,10 +421,12 @@
       </div>
 
       <!-- Financial Volume & Trips -->
-      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between shadow-md">
+      <div class="theme-card cyber-reticle p-5 flex flex-col justify-between">
         <div class="text-xs text-slate-400 flex items-center justify-between">
           <span class="text-sm font-semibold text-slate-200">Gross Revenue</span>
-          <i data-lucide="dollar-sign" class="h-4 w-4 text-slate-400"></i>
+          <div class="h-7 w-7 rounded-lg bg-slate-800/80 flex items-center justify-center text-slate-300">
+            <i data-lucide="dollar-sign" class="h-4 w-4"></i>
+          </div>
         </div>
         <div class="my-3">
           <div id="kpi-revenue" class="text-3xl font-bold font-mono text-white num-tabular tracking-tight">$38,420</div>
@@ -274,10 +439,12 @@
       </div>
 
       <!-- Anomaly Sentry Card -->
-      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between shadow-md">
+      <div class="theme-card cyber-reticle p-5 flex flex-col justify-between">
         <div class="text-xs text-slate-400 flex items-center justify-between">
           <span class="text-sm font-semibold text-slate-200">Anomaly Sentry</span>
-          <i data-lucide="alert-triangle" class="h-4 w-4 text-anomaly"></i>
+          <div class="h-7 w-7 rounded-lg bg-anomaly/10 flex items-center justify-center text-anomaly">
+            <i data-lucide="alert-triangle" class="h-4 w-4"></i>
+          </div>
         </div>
         <div class="my-3">
           <div id="kpi-anomalies" class="text-3xl font-bold font-mono text-anomaly num-tabular tracking-tight">13</div>
@@ -317,7 +484,7 @@
     <div id="tab-realtime" class="tab-content space-y-4">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Live Demand Curve Chart (Spans 2 cols) -->
-        <div class="lg:col-span-2 bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+        <div class="lg:col-span-2 theme-card cyber-reticle p-5 space-y-4">
           <div class="flex items-center justify-between">
             <div>
               <h2 class="text-lg font-semibold text-white tracking-tight">Live Demand Curve (Hourly Aggregate Buckets)</h2>
@@ -334,8 +501,8 @@
           </div>
         </div>
 
-        <!-- Real-Time Stream Ingestion Feed (Flush Rows, Zero Nested Cards) -->
-        <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-3 flex flex-col shadow-lg">
+        <!-- Real-Time Stream Ingestion Feed -->
+        <div class="theme-card cyber-reticle p-5 space-y-3 flex flex-col">
           <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
             <div class="flex items-center gap-2">
               <span class="h-2 w-2 rounded-full bg-telemetry pulse-dot"></span>
@@ -345,7 +512,7 @@
           </div>
 
           <div id="stream-feed-list" class="divide-y divide-slate-800/80 flex-1 max-h-72 overflow-y-auto pr-1 text-xs font-mono">
-            <!-- Dynamic Feed Rows (Flush, no nested box cards) -->
+            <!-- Dynamic Feed Rows -->
           </div>
         </div>
       </div>
@@ -353,7 +520,7 @@
 
     <!-- TAB 2: Machine Learning & Demand Forecasting -->
     <div id="tab-forecast" class="tab-content hidden space-y-6">
-      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+      <div class="theme-card cyber-reticle p-5 space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 class="text-lg font-semibold text-white tracking-tight">24-Hour Horizon Predictive Demand Forecaster</h2>
@@ -379,7 +546,7 @@
       </div>
 
       <!-- Model Evaluation Benchmark Table -->
-      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+      <div class="theme-card cyber-reticle p-5 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
           <div>
             <h3 class="text-base font-semibold text-white tracking-tight">Walk-Forward Model Benchmark (Strictly Zero Future Leakage)</h3>
@@ -412,7 +579,7 @@
 
     <!-- TAB 3: Anomaly Monitoring Studio -->
     <div id="tab-anomalies" class="tab-content hidden space-y-4">
-      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+      <div class="theme-card cyber-reticle p-5 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
           <div>
             <h2 class="text-lg font-semibold text-white tracking-tight">Unsupervised Demand Anomaly Sentry</h2>
@@ -424,7 +591,7 @@
         </div>
 
         <div id="anomalies-container" class="divide-y divide-slate-800/80 max-h-96 overflow-y-auto pr-1">
-          <!-- Dynamic Anomaly items (Flush rows, zero nested cards) -->
+          <!-- Dynamic Anomaly items -->
         </div>
       </div>
     </div>
@@ -432,19 +599,19 @@
     <!-- TAB 4: Pipeline Lineage & Data Quality -->
     <div id="tab-health" class="tab-content hidden space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="bg-surface border border-slate-800/80 rounded-xl p-5 shadow-sm">
+        <div class="theme-card cyber-reticle p-5">
           <div class="text-xs font-mono uppercase tracking-wider text-slate-400">Bronze Table: raw_trips</div>
           <div id="health-bronze-count" class="text-3xl font-bold font-mono text-white num-tabular mt-2">1,200</div>
           <div class="text-xs text-slate-400 mt-1">Immutable streaming raw log</div>
         </div>
 
-        <div class="bg-surface border border-slate-800/80 rounded-xl p-5 shadow-sm">
+        <div class="theme-card cyber-reticle p-5">
           <div class="text-xs font-mono uppercase tracking-wider text-telemetry font-semibold">Silver Table: silver_trips</div>
           <div id="health-silver-count" class="text-3xl font-bold font-mono text-telemetry num-tabular mt-2">1,200</div>
           <div class="text-xs text-slate-400 mt-1">Deduplicated & validated schema</div>
         </div>
 
-        <div class="bg-surface border border-slate-800/80 rounded-xl p-5 shadow-sm">
+        <div class="theme-card cyber-reticle p-5">
           <div class="text-xs font-mono uppercase tracking-wider text-predictive font-semibold">Gold Table: gold_hourly_demand</div>
           <div id="health-gold-count" class="text-3xl font-bold font-mono text-predictive num-tabular mt-2">243</div>
           <div class="text-xs text-slate-400 mt-1">Hourly aggregation marts</div>
@@ -452,7 +619,7 @@
       </div>
 
       <!-- Automated Quality Checks Table -->
-      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+      <div class="theme-card cyber-reticle p-5 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
           <div>
             <h3 class="text-base font-semibold text-white tracking-tight">Automated Pipeline Health & Quality Tests</h3>
@@ -464,14 +631,14 @@
         </div>
 
         <div id="data-quality-tests-container" class="divide-y divide-slate-800/80">
-          <!-- Dynamic test items (Flush rows) -->
+          <!-- Dynamic test items -->
         </div>
       </div>
     </div>
 
     <!-- TAB 5: Historical Trip Explorer -->
     <div id="tab-explorer" class="tab-content hidden space-y-4">
-      <div class="bg-surface border border-slate-800/80 rounded-xl p-5 space-y-4 shadow-lg">
+      <div class="theme-card cyber-reticle p-5 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
           <div>
             <h2 class="text-lg font-semibold text-white tracking-tight">Cleaned Trip Records (Silver Tier)</h2>
@@ -503,13 +670,67 @@
 
   </main>
 
-  <!-- FlowSight JavaScript Engine -->
+  <!-- Persistent Floating Sample Switcher Dock -->
+  <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-[#0c1220]/90 backdrop-blur-xl border border-white/15 px-3 py-2 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] flex items-center gap-2 text-xs">
+    <span class="text-slate-400 font-medium pl-2 pr-1 hidden sm:inline flex items-center gap-1.5">
+      <i data-lucide="palette" class="h-3.5 w-3.5 text-indigo-400"></i> Sample Selector:
+    </span>
+    <button onclick="setTheme('aurora')" id="dock-btn-aurora" class="px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1.5 bg-indigo-500/25 text-indigo-300 border border-indigo-400/40 shadow-sm">
+      <span class="text-amber-300">✦</span> Aurora (Linear)
+    </button>
+    <button onclick="setTheme('cyber')" id="dock-btn-cyber" class="px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200">
+      <span class="text-cyan-400">⚡</span> Mission Control
+    </button>
+    <button onclick="setTheme('enterprise')" id="dock-btn-enterprise" class="px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200">
+      <span class="text-sky-400">☁</span> Enterprise Cloud
+    </button>
+  </div>
+
+  <!-- FlowSight JavaScript Engine with Live Multi-Sample Switcher -->
   <script>
     lucide.createIcons();
 
     let realtimeChart = null;
     let forecastChart = null;
     let currentSpeed = 10;
+
+    // Theme Switcher Logic (Carbon Specification)
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('flowsight_theme', theme);
+
+      // Update button active states in Header & Floating Dock
+      ['aurora', 'cyber', 'enterprise'].forEach(t => {
+        const topBtn = document.getElementById(`btn-theme-${t}`);
+        const dockBtn = document.getElementById(`dock-btn-${t}`);
+        const isActive = (t === theme);
+
+        const activeCls = 'px-3 py-1.5 rounded-full font-semibold transition flex items-center gap-1.5 bg-indigo-500/25 text-indigo-300 border border-indigo-400/50 shadow-sm';
+        const inactiveCls = 'px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200';
+
+        if (topBtn) {
+          topBtn.className = isActive
+            ? 'px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm'
+            : 'px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200';
+        }
+        if (dockBtn) {
+          dockBtn.className = isActive ? activeCls : inactiveCls;
+        }
+      });
+
+      if (realtimeChart) realtimeChart.update('none');
+    }
+
+    // Keyboard Shortcuts: Press 1, 2, 3 to switch samples instantly!
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '1') setTheme('aurora');
+      if (e.key === '2') setTheme('cyber');
+      if (e.key === '3') setTheme('enterprise');
+    });
+
+    // Load saved theme (Default to Aurora)
+    const savedTheme = localStorage.getItem('flowsight_theme') || 'aurora';
+    setTheme(savedTheme);
 
     function switchTab(tab) {
       document.querySelectorAll('.tab-btn').forEach(b => {
@@ -617,7 +838,7 @@
       const points = demandPoints.slice(-48);
       const labels = points.map(p => new Date(p.time_bucket).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       const values = points.map(p => p.trip_count);
-      const colors = points.map(p => p.is_anomaly ? '#f59e0b' : '#10b981');
+      const colors = points.map(p => p.is_anomaly ? '#fbbf24' : '#34d399');
 
       if (realtimeChart) {
         realtimeChart.data.labels = labels;
@@ -633,7 +854,7 @@
               label: 'Hourly Demand',
               data: values,
               backgroundColor: colors,
-              borderRadius: 3
+              borderRadius: 4
             }]
           },
           options: {
@@ -688,7 +909,7 @@
               label: 'Upper Interval (115%)',
               data: upperVals,
               borderColor: 'transparent',
-              backgroundColor: 'rgba(99, 102, 241, 0.12)',
+              backgroundColor: 'rgba(129, 140, 248, 0.12)',
               fill: '+1',
               pointRadius: 0
             },
@@ -703,11 +924,11 @@
             {
               label: 'LightGBM Forecast',
               data: lgbVals,
-              borderColor: '#6366f1',
+              borderColor: '#818cf8',
               borderWidth: 2.5,
               tension: 0.35,
               pointRadius: 3,
-              pointBackgroundColor: '#6366f1'
+              pointBackgroundColor: '#818cf8'
             },
             {
               label: 'Baseline Hourly Profile',
