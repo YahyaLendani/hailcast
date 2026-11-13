@@ -1,8 +1,8 @@
 import time
 import logging
 from datetime import datetime
-from typing import List, Dict, Any
-from sqlalchemy import select, func, text
+from typing import List, Dict, Any, Set
+from sqlalchemy import select, func
 from app.core.database import AsyncSessionLocal
 from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand, PipelineRun, DataQualityLog
 from app.services.data_cleaner import DataCleaner
@@ -30,6 +30,7 @@ class ETLPipeline:
             await session.flush()
 
             silver_candidates = []
+            seen_event_ids: Set[str] = set()
 
             for item in trips_data:
                 try:
@@ -43,11 +44,18 @@ class ETLPipeline:
                         p_time, d_time, p_loc, d_loc, fare
                     )
 
-                    # Deduplication check
-                    exists = await session.execute(select(RawTrip.id).where(RawTrip.event_id == event_id))
-                    if exists.scalar_one_or_none():
+                    # Deduplication check (in-batch + DB)
+                    if event_id in seen_event_ids:
                         deduplicated += 1
                         continue
+
+                    exists = await session.execute(select(RawTrip.id).where(RawTrip.event_id == event_id))
+                    if exists.scalar_one_or_none():
+                        seen_event_ids.add(event_id)
+                        deduplicated += 1
+                        continue
+
+                    seen_event_ids.add(event_id)
 
                     raw = RawTrip(
                         event_id=event_id,
@@ -185,4 +193,3 @@ class ETLPipeline:
 
             await session.commit()
             logger.info("Gold transformations completed. Upserted %d hourly buckets.", len(rows))
-

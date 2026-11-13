@@ -98,3 +98,32 @@ async def get_trips(
     res = await db.execute(query)
     return res.scalars().all()
 
+
+
+@router.get("/demand-series")
+async def get_demand_series(
+    hours: int = Query(72, ge=1, le=336, description="Most recent hours to return"),
+    db: AsyncSession = Depends(get_db)
+):
+    """City-wide hourly demand (all zones summed) for the most recent hours, oldest first."""
+    query = (
+        select(
+            GoldHourlyDemand.time_bucket,
+            func.sum(GoldHourlyDemand.trip_count),
+            func.sum(GoldHourlyDemand.total_revenue),
+            func.sum(func.coalesce(GoldHourlyDemand.is_anomaly, False)),
+        )
+        .group_by(GoldHourlyDemand.time_bucket)
+        .order_by(GoldHourlyDemand.time_bucket.desc())
+        .limit(hours)
+    )
+    rows = (await db.execute(query)).all()
+    return [
+        {
+            "time_bucket": bucket.isoformat(),
+            "trip_count": int(trips or 0),
+            "total_revenue": round(float(revenue or 0.0), 2),
+            "anomalous_zones": int(anomalies or 0),
+        }
+        for bucket, trips, revenue, anomalies in reversed(rows)
+    ]

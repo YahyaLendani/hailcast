@@ -1,4 +1,4 @@
-# 📊 FlowSight
+# 📊 Hailcast
 
 **Real-Time Data Engineering & Predictive Analytics Platform**
 
@@ -13,7 +13,7 @@
 
 ## 📌 Executive Overview
 
-**FlowSight** is an enterprise-grade data engineering and predictive analytics platform engineered to process transportation datasets, execute real-time event streaming, enforce Medallion data architectures (Bronze $\to$ Silver $\to$ Gold), and generate live machine learning forecasts.
+**Hailcast** (formerly FlowSight) is an enterprise-grade data engineering and predictive analytics platform engineered to process transportation datasets, execute real-time event streaming, enforce Medallion data architectures (Bronze $\to$ Silver $\to$ Gold), and generate live machine learning forecasts.
 
 Its purpose is to demonstrate the complete, robust lifecycle of a distributed data system:
 1. **Ingestion**: Scalable batch loading and controllable historical event replay simulating a live streaming environment.

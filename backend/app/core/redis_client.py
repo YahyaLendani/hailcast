@@ -48,7 +48,7 @@ class RedisStreamClient:
 
     async def publish_event(self, event_data: Dict[str, Any]) -> str:
         """Publish event to Redis Stream or fallback in-memory stream."""
-        payload = json.dumps(event_data)
+        payload = json.dumps(event_data, default=str)
         if self.is_connected and self.redis:
             try:
                 msg_id = await self.redis.xadd(
@@ -129,4 +129,3 @@ class RedisStreamClient:
         }
 
 redis_client = RedisStreamClient()
-

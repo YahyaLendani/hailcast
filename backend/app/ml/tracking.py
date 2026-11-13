@@ -17,7 +17,8 @@ class ExperimentTracker:
         params: Dict[str, Any],
         metrics: Dict[str, float],
         artifacts: Dict[str, str],
-        dataset_info: Dict[str, Any]
+        dataset_info: Dict[str, Any],
+        extra: Dict[str, Any] | None = None
     ) -> Dict[str, Any]:
         """Log experiment run metrics and metadata."""
         run_record = {
@@ -29,6 +30,8 @@ class ExperimentTracker:
             "artifacts": artifacts,
             "dataset_info": dataset_info
         }
+        if extra:
+            run_record.update(extra)
 
         # Try MLflow if available
         try:

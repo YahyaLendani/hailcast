@@ -1,11 +1,11 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, Any, List
-from sqlalchemy import select, update
+from typing import Dict, Any, List, Set, Tuple
+from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
 from app.core.redis_client import redis_client
-from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand, PipelineRun
+from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand
 from app.services.data_cleaner import DataCleaner
 from app.services.broadcaster import broadcaster
 
@@ -64,6 +64,14 @@ class StreamingWorker:
 
     async def _process_batch(self, events: List[Dict[str, Any]]):
         async with AsyncSessionLocal() as session:
+            # AsyncSessionLocal uses autoflush=False, so track pending event_ids and
+            # GoldHourlyDemand (time_bucket, location_id) rows within the current batch
+            # to prevent intra-batch duplicate INSERT UNIQUE constraint violations.
+            seen_event_ids: Set[str] = set()
+            gold_cache: Dict[Tuple[datetime, int], GoldHourlyDemand] = {}
+            batch_processed = 0
+            batch_deduplicated = 0
+
             try:
                 for entry in events:
                     payload = entry["payload"]
@@ -79,11 +87,18 @@ class StreamingWorker:
                         p_time, d_time, p_loc, d_loc, fare
                     )
 
-                    # 1. Idempotency Check: check if already exists
+                    # 1. Idempotency Check: check in-batch cache first, then database
+                    if event_id in seen_event_ids:
+                        batch_deduplicated += 1
+                        continue
+
                     existing = await session.execute(select(RawTrip.id).where(RawTrip.event_id == event_id))
                     if existing.scalar_one_or_none():
-                        self.deduplicated_count += 1
+                        seen_event_ids.add(event_id)
+                        batch_deduplicated += 1
                         continue
+
+                    seen_event_ids.add(event_id)
 
                     raw_trip = RawTrip(
                         event_id=event_id,
@@ -108,22 +123,30 @@ class StreamingWorker:
                     if is_valid and silver_trip:
                         session.add(silver_trip)
 
-                        # 3. Gold aggregation (Hourly bucket)
+                        # 3. Gold aggregation (Hourly bucket) with in-batch cache
                         bucket = p_time.replace(minute=0, second=0, microsecond=0)
-                        gold_res = await session.execute(
-                            select(GoldHourlyDemand).where(
-                                GoldHourlyDemand.time_bucket == bucket,
-                                GoldHourlyDemand.location_id == p_loc
-                            )
-                        )
-                        gold_record = gold_res.scalar_one_or_none()
+                        bucket_key = (bucket, p_loc)
+                        gold_record = gold_cache.get(bucket_key)
 
-                        if gold_record:
+                        if gold_record is None:
+                            gold_res = await session.execute(
+                                select(GoldHourlyDemand).where(
+                                    GoldHourlyDemand.time_bucket == bucket,
+                                    GoldHourlyDemand.location_id == p_loc
+                                )
+                            )
+                            gold_record = gold_res.scalar_one_or_none()
+                            if gold_record is not None:
+                                gold_cache[bucket_key] = gold_record
+
+                        if gold_record is not None:
                             new_count = gold_record.trip_count + 1
                             gold_record.trip_count = new_count
                             gold_record.total_passengers += silver_trip.passenger_count
                             gold_record.total_revenue = round(gold_record.total_revenue + silver_trip.total_amount, 2)
-                            gold_record.avg_fare = round(gold_record.total_revenue / new_count, 2)
+                            gold_record.avg_fare = round(
+                                (gold_record.avg_fare * (new_count - 1) + silver_trip.fare_amount) / new_count, 2
+                            )
                             gold_record.avg_distance = round(
                                 (gold_record.avg_distance * (new_count - 1) + silver_trip.trip_distance) / new_count, 2
                             )
@@ -138,23 +161,28 @@ class StreamingWorker:
                                 trip_count=1,
                                 total_passengers=silver_trip.passenger_count,
                                 avg_distance=silver_trip.trip_distance,
-                                avg_fare=silver_trip.total_amount,
+                                avg_fare=silver_trip.fare_amount,
                                 total_revenue=silver_trip.total_amount,
                                 avg_duration_minutes=silver_trip.trip_duration_minutes,
                                 updated_at=datetime.utcnow()
                             )
                             session.add(gold_record)
+                            gold_cache[bucket_key] = gold_record
 
-                    self.processed_count += 1
-                    self._eps_count += 1
+                    batch_processed += 1
 
                 await session.commit()
+                self.processed_count += batch_processed
+                self.deduplicated_count += batch_deduplicated
+                self._eps_count += batch_processed
 
                 # Broadcast live event to frontend subscribers
                 if events:
                     latest = events[-1]["payload"]
                     await broadcaster.broadcast("new_trip_streamed", {
                         "batch_size": len(events),
+                        "ingested_in_batch": batch_processed,
+                        "deduplicated_in_batch": batch_deduplicated,
                         "total_processed": self.processed_count,
                         "eps": self.last_eps,
                         "sample": latest.get("data", latest)
@@ -166,4 +194,3 @@ class StreamingWorker:
                 self.failed_count += len(events)
 
 streaming_worker = StreamingWorker()
-

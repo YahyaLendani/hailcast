@@ -15,7 +15,7 @@ DEFAULT_SQLITE_PATH = (BASE_DIR_PATH / "flowsight.db").as_posix()
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "FlowSight"
+    PROJECT_NAME: str = "Hailcast"
     VERSION: str = "1.0.0"
     DESCRIPTION: str = (
         "Real-Time Transportation Analytics, Historical Event Replay, "

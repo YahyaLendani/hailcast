@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flowsight",
+      "runtimeExecutable": "C:\\Users\\yahya\\Desktop\\flowsight\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--port", "8000", "--app-dir", "C:\\Users\\yahya\\Desktop\\flowsight\\backend"],
+      "port": 8000
+    }
+  ]
+}

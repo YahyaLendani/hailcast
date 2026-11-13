@@ -12,7 +12,7 @@ from app.schemas.ml import (
     ForecastRequest, ForecastResponse, ForecastPoint,
     ModelComparisonResponse, ModelMetrics, AnomalyPoint
 )
-from app.ml.train import train_and_evaluate
+from app.ml.train import train_and_evaluate, forecast_citywide
 from app.ml.models import LightGBMDemandForecaster, BaselineHourlyAverageModel
 from app.ml.feature_engineering import FeatureEngineer
 from app.ml.tracking import experiment_tracker
@@ -25,11 +25,8 @@ async def trigger_training(db: AsyncSession = Depends(get_db)):
     """Train gradient-boosting model and compare against baselines using time-aware validation."""
     res = await db.execute(select(GoldHourlyDemand).order_by(GoldHourlyDemand.time_bucket.asc()))
     records = res.scalars().all()
-    if len(records) < 24:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Need at least 24 hourly aggregate records to train. Currently have {len(records)}. Seed sample data first."
-        )
+    if not records:
+        raise HTTPException(status_code=400, detail="No hourly demand data yet. Seed sample data or start the replay first.")
 
     # Convert to pandas
     data = [
@@ -47,7 +44,10 @@ async def trigger_training(db: AsyncSession = Depends(get_db)):
     df = pd.DataFrame(data)
     
     # 1. Run ML Training & Evaluation
-    train_summary = train_and_evaluate(df)
+    try:
+        train_summary = train_and_evaluate(df)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     # 2. Run Anomaly Detection and update DB
     anom_results = anomaly_detector.fit_detect(data)
@@ -64,151 +64,94 @@ async def trigger_training(db: AsyncSession = Depends(get_db)):
         "results": train_summary
     }
 
-@router.get("/models", response_model=ModelComparisonResponse)
-async def get_model_comparison(db: AsyncSession = Depends(get_db)):
-    """Compare LightGBM gradient-boosting forecaster against baseline models."""
+def _latest_metrics() -> tuple[List[ModelMetrics], Optional[str]]:
+    """Walk-forward metrics from the most recent training run (empty if never trained)."""
     experiments = experiment_tracker.get_experiments()
-    
-    # If no experiment logged yet, provide benchmark metrics or defaults
-    if experiments:
-        latest = experiments[-1]
-        metrics_dict = latest["metrics"]
-        models_metrics = [
-            ModelMetrics(
-                model_name=metrics_dict["model_name"],
-                mae=metrics_dict["mae"],
-                rmse=metrics_dict["rmse"],
-                mape=metrics_dict["mape"],
-                r2_score=metrics_dict["r2_score"],
-                validation_method=metrics_dict.get("validation_method", "TimeSeriesSplit (3-Fold Walk-Forward)"),
-                train_samples=metrics_dict.get("train_samples", 120),
-                test_samples=metrics_dict.get("test_samples", 48)
-            )
-        ]
-    else:
-        # Benchmark results on NYC TLC standard dataset
-        models_metrics = [
-            ModelMetrics(
-                model_name="Baseline_Persistence",
-                mae=18.45,
-                rmse=26.30,
-                mape=32.4,
-                r2_score=0.482,
-                validation_method="TimeSeriesSplit (3-Fold Walk-Forward)",
-                train_samples=120,
-                test_samples=48
-            ),
-            ModelMetrics(
-                model_name="Baseline_Hourly_Avg",
-                mae=12.80,
-                rmse=18.95,
-                mape=21.2,
-                r2_score=0.710,
-                validation_method="TimeSeriesSplit (3-Fold Walk-Forward)",
-                train_samples=120,
-                test_samples=48
-            ),
-            ModelMetrics(
-                model_name="LightGBM_Forecaster",
-                mae=7.15,
-                rmse=10.42,
-                mape=11.8,
-                r2_score=0.915,
-                validation_method="TimeSeriesSplit (3-Fold Walk-Forward)",
-                train_samples=120,
-                test_samples=48
-            )
-        ]
+    if not experiments:
+        return [], None
+    latest = experiments[-1]
+    rows = latest.get("all_metrics") or [latest["metrics"]]
+    metrics = [ModelMetrics(**row) for row in rows]
+    best = latest.get("best_model") or min(metrics, key=lambda m: m.mae).model_name
+    return metrics, best
 
-    # Load feature importances if model file exists
+
+async def _gold_frame(db: AsyncSession) -> pd.DataFrame:
+    res = await db.execute(
+        select(GoldHourlyDemand.time_bucket, GoldHourlyDemand.trip_count)
+        .order_by(GoldHourlyDemand.time_bucket.asc())
+    )
+    return pd.DataFrame([tuple(r) for r in res.all()], columns=["time_bucket", "trip_count"])
+
+
+@router.get("/models", response_model=ModelComparisonResponse)
+async def get_model_comparison():
+    """Compare the LightGBM forecaster against baselines using the latest training run."""
+    metrics, best = _latest_metrics()
+
+    importances: Dict[str, float] = {}
     model_file = settings.MODEL_DIR / "lightgbm_demand_forecaster.joblib"
-    importances = {
-        "hour_sin": 0.22,
-        "hour_cos": 0.18,
-        "lag_1h": 0.24,
-        "lag_24h": 0.15,
-        "rolling_mean_6h": 0.11,
-        "dow_sin": 0.06,
-        "is_rush_hour": 0.04
-    }
-    if model_file.exists():
+    if metrics and model_file.exists():
         try:
             m = LightGBMDemandForecaster()
             m.load(model_file)
-            importances = m.get_feature_importances() or importances
+            importances = m.get_feature_importances()
         except Exception:
-            pass
+            importances = {}
 
     return ModelComparisonResponse(
-        models=models_metrics,
-        best_model="LightGBM_Forecaster",
+        models=metrics,
+        best_model=best or "untrained",
         feature_importances=importances
     )
 
 @router.post("/forecast", response_model=ForecastResponse)
 async def generate_forecast(req: ForecastRequest, db: AsyncSession = Depends(get_db)):
-    """Generate multi-hour demand forecasts with confidence intervals."""
-    res = await db.execute(select(GoldHourlyDemand).order_by(GoldHourlyDemand.time_bucket.asc()))
-    records = res.scalars().all()
-    
-    now = datetime.utcnow()
-    last_time = records[-1].time_bucket if records else now.replace(minute=0, second=0, microsecond=0)
+    """Recursive city-wide demand forecast from the trained LightGBM model."""
+    df = await _gold_frame(db)
+    model_file = settings.MODEL_DIR / "lightgbm_demand_forecaster.joblib"
+    metrics, _best = _latest_metrics()
 
-    # Base profile for forecasting future hours
-    points: List[ForecastPoint] = []
-    
-    # Generate horizon points
-    for step in range(1, req.horizon_hours + 1):
-        target_time = last_time + timedelta(hours=step)
-        hr = target_time.hour
-        dow = target_time.weekday()
-        is_wknd = dow in [5, 6]
+    try:
+        if not metrics or not model_file.exists():
+            train_and_evaluate(df)
+            metrics, _best = _latest_metrics()
+        result = forecast_citywide(df, req.horizon_hours)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
-        # Diurnal pattern
-        if 0 <= hr <= 5:
-            base_demand = 18.0
-        elif 6 <= hr <= 9:
-            base_demand = 75.0 if not is_wknd else 32.0
-        elif 10 <= hr <= 15:
-            base_demand = 55.0
-        elif 16 <= hr <= 20:
-            base_demand = 88.0 if not is_wknd else 70.0
-        else:
-            base_demand = 42.0
+    lgb = next((m for m in metrics if m.model_name == "LightGBM_Forecaster"), metrics[0])
+    # ~80% band derived from the walk-forward RMSE of the validation folds
+    band = 1.28 * lgb.rmse
 
-        # Model forecast value with slight stochastic variance for realism
-        predicted = round(base_demand * np.random.uniform(0.96, 1.04), 1)
-        lower = round(max(0.0, predicted * 0.85), 1)
-        upper = round(predicted * 1.15, 1)
-        baseline = round(base_demand * 0.92, 1)
-
-        points.append(
-            ForecastPoint(
-                timestamp=target_time,
-                predicted_demand=predicted,
-                lower_bound=lower,
-                upper_bound=upper,
-                baseline_demand=baseline
-            )
+    points = [
+        ForecastPoint(
+            timestamp=step["timestamp"],
+            predicted_demand=round(step["predicted"], 1),
+            lower_bound=round(max(0.0, step["predicted"] - band), 1),
+            upper_bound=round(step["predicted"] + band, 1),
+            baseline_demand=round(step["baseline"], 1)
         )
-
-    metrics = ModelMetrics(
-        model_name="LightGBM_Forecaster",
-        mae=7.15,
-        rmse=10.42,
-        mape=11.8,
-        r2_score=0.915,
-        validation_method="TimeSeriesSplit (3-Fold Walk-Forward)",
-        train_samples=168,
-        test_samples=48
-    )
+        for step in result["steps"]
+    ]
+    history = [
+        ForecastPoint(
+            timestamp=h["timestamp"],
+            predicted_demand=h["actual"],
+            lower_bound=h["actual"],
+            upper_bound=h["actual"],
+            actual_demand=h["actual"]
+        )
+        for h in result["history"]
+    ]
 
     return ForecastResponse(
         model_name="LightGBM_Forecaster",
         horizon_hours=req.horizon_hours,
         generated_at=datetime.utcnow(),
-        metrics=metrics,
-        forecasts=points
+        metrics=lgb,
+        forecasts=points,
+        history=history
     )
 
 @router.get("/anomalies", response_model=List[AnomalyPoint])

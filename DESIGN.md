@@ -1,64 +1,66 @@
-# FlowSight Design System & Specification (Impeccable Operate Mode)
+# Hailcast Design System
 
-## Visual World: Obsidian Data Ops
-FlowSight follows the **Operate** surface mode: high scanability, dense information hierarchy, restrained geometry, and mission-control ergonomics inspired by modern data engineering observability platforms (Datadog, Stripe Data, Grafana, Linear).
+## Visual world: the transit line
 
----
+Hailcast is an Operate surface: a dashboard read at a desk, in daylight, by data
+engineers and people evaluating the system. The look borrows from printed transit
+graphics (route diagrams, timetables, station signage), not from dark "mission
+control" dashboards. One light theme, no theme switcher.
 
-## Design Tokens & Palette
+The signature is the pipeline drawn as a route line: Replay buffer, Stream, Bronze,
+Silver, Gold are stations on one line with a lettered bullet each. The line shows a
+moving dash only while the replay is running.
 
-### Neutral Foundation
-- **Canvas / Root Background**: `#080c14` (Deep obsidian dark space)
-- **Panel / Surface 1**: `#0e1422` (Subtle elevation)
-- **Surface 2 (Interactive)**: `#141d30`
-- **Surface Hover**: `#1a263d`
-- **Hairline Border**: `rgba(255, 255, 255, 0.08)` / `#1e293b`
-- **Active Focus Ring**: `2px solid #34d399` with `1px outline-offset`
+## Tokens
 
-### Semantic Accents & Contrast Ratios (WCAG AA Compliant)
-- **Streaming & Health (Emerald / Telemetry)**:
-  - Primary / Highlight: `#34d399` (Emerald 400 — Contrast: >8.5:1 against `#080c14`)
-  - Accent / Dim: `#059669` (Emerald 600)
-  - Surface: `rgba(52, 211, 153, 0.15)`
-  - Border: `rgba(52, 211, 153, 0.35)`
-- **Machine Learning & Forecasting (Indigo / Predictive)**:
-  - Primary / Highlight: `#818cf8` (Indigo 400 — Contrast: 6.2:1 against `#0e1422`)
-  - Accent / Dim: `#4f46e5` (Indigo 600)
-  - Surface: `rgba(129, 140, 248, 0.15)`
-  - Border: `rgba(129, 140, 248, 0.35)`
-- **Anomaly Monitoring (Amber / Alert)**:
-  - Primary / Highlight: `#fbbf24` (Amber 400 — Contrast: 9.8:1 against `#080c14`)
-  - Accent / Dim: `#d97706` (Amber 600)
-  - Surface: `rgba(251, 191, 36, 0.15)`
-  - Border: `rgba(251, 191, 36, 0.35)`
+| Token | Value | Use |
+| :--- | :--- | :--- |
+| `--paper` | `#f3f0e8` | Page ground |
+| `--surface` | `#fbfaf6` | Replay bar, chart surface |
+| `--ink` | `#16150f` | Text, rules, signage band |
+| `--ink-2` | `#454238` | Secondary text |
+| `--ink-3` | `#676357` | Labels, hints (4.9:1 on paper) |
+| `--rule` | `#d8d3c4` | Hairlines, grid lines |
+| `--yellow` | `#f6b900` | Primary action, brand bullet, Gold tier. Fill only, never text |
+| `--blue` | `#0b57d0` | Observed data, focus ring |
+| `--orange` | `#b0480e` | Forecast series |
+| `--ok` / `--alert` | `#1b6e45` / `#b42318` | Status only, always with a text label |
+| `--bronze` / `--silver` | `#9a5a2c` / `#7b8089` | Tier bullets |
 
----
+The chart pair (blue observed, orange forecast) passes the dataviz palette validator
+on the light surface (colour-blind separation, contrast, chroma). Status colours are
+never reused as series colours.
 
-## Typography Ramp (Major Third 1.25x Progression)
+## Type
 
-FlowSight adheres to a strict geometric type ramp to eliminate flat-type hierarchies:
+- **Schibsted Grotesk** for everything. Weights 400 to 800.
+- **IBM Plex Mono** only for identifiers (event IDs, check names, feature names).
+- Scale: body 15, labels and hints 13, section heading 20/700, figures 22/700,
+  station counts 28/700, wordmark 24/800.
+- Tabular numerals in table cells and the live feed only; display figures stay
+  proportional.
 
-| Role | Size | Line Height | Weight | Usage |
-| :--- | :--- | :--- | :--- | :--- |
-| **KPI Readout (H1)** | `24px` (`1.5rem`) | `1.25` | Bold (`700`) | Top-level dashboard title & primary metric cards (`tabular-nums`) |
-| **Section Header (H2)** | `19px` (`1.1875rem`) | `1.30` | Semibold (`600`) | View titles, primary chart headers |
-| **Panel Header (H3)** | `15px` (`0.9375rem`) | `1.40` | Semibold (`600`) | Quality check tables, benchmark headers |
-| **Body (Base)** | `14px` (`0.875rem`) | `1.50` | Regular (`400`) | General text, descriptions, table body |
-| **Micro / Telemetry** | `12px` (`0.75rem`) | `1.40` | Medium (`500`) | Secondary metadata, labels, status tags |
-| **Optical Floor** | `11px` (`0.6875rem`) | `1.20` | Semibold / Mono | Sub-labels, uppercase pill tags (Strict 11px floor) |
+## Layout
 
-- **Tabular Numerics**: `num-tabular` (`font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;`) applied across all live counts, throughput rates, fares, and timestamps to prevent layout jitter during 50x event replay.
+- Sections are separated by a 2px ink rule above the heading. No cards, no nested
+  containers, no shadows.
+- Signage band (ink) holds the wordmark, connection state and the replay clock.
+- The replay bar is sticky and carries the only primary action. A yellow hairline
+  along its bottom edge shows replay progress.
+- Five tabs: Demand, Forecast, Anomalies, Data quality, Trips. The tab is kept in
+  the URL hash.
+- Under 900px the two-column splits stack; under 640px the route line turns
+  vertical and the replay bar stops being sticky.
 
----
+## Charts
 
-## Impeccable Mechanical Audit Compliance
+- One y-axis per chart, zero-based, recessive grid, tooltips on hover.
+- Demand: one blue bar per hour; hours containing a flagged zone are drawn in the
+  alert colour and named in the legend.
+- Forecast: observed (blue), forecast (orange), an 80% range band, and a dashed
+  neutral reference for the typical hour. Legend sits above the plot in text ink.
 
-FlowSight achieved a **0-defect score** on the Impeccable mechanical detector:
-1. **De-nested Cards**: Eliminated cards-in-cards. Medallion progression strip runs in a single horizontal chassis with hairline vertical dividers (`divide-x`). Real-time feeds and anomaly lists are styled as flush divided rows (`divide-y`), eliminating nested containers.
-2. **WCAG AA Contrast Calibration**: Purged low-contrast `text-slate-500` (4.1:1). All secondary text is upgraded to `text-slate-400` (7.3:1) and `text-slate-300`. Action buttons meet >10:1 contrast.
-3. **Optical Floor**: Enforced an 11px floor. All micro-badges and tags use 11px or 12px with uppercase tracking, ensuring crisp rendering across high-DPI and standard monitors.
-4. **Craft Floor Guarantees**:
-   - Zero gradient text headings.
-   - Zero eyebrow/kicker decorations.
-   - Zero hard offset drop shadows; replaced with soft atmospheric elevation.
-   - Fully themed browser scrollbars and focus rings.
+## Copy
+
+Plain labels, sentence case. Empty states say what to do next. The model verdict is
+written from the real validation numbers and says so when a baseline wins.

@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="FlowSight: Real-Time Data Engineering & Predictive Analytics Platform",
+    description="Hailcast: NYC taxi demand, streamed through a Medallion pipeline and forecast",
     lifespan=lifespan
 )
 
@@ -98,12 +98,12 @@ async def serve_dashboard():
     static_file = Path(__file__).parent / "static" / "index.html"
     if static_file.exists():
         return FileResponse(static_file)
-    return HTMLResponse("<h1>FlowSight Platform Online</h1><p>Visit <a href='/docs'>/docs</a> for API</p>")
+    return HTMLResponse("<h1>Hailcast is online</h1><p>Visit <a href='/docs'>/docs</a> for API</p>")
 
 @app.get("/api/info")
 async def api_info():
     return {
-        "platform": "FlowSight",
+        "platform": "Hailcast",
         "description": "Real-Time Data Engineering & Predictive Analytics Platform",
         "status": "online",
         "docs_url": "/docs",

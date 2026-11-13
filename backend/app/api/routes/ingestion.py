@@ -13,14 +13,14 @@ router = APIRouter(prefix="/ingest", tags=["Ingestion"])
 @router.post("/batch", response_model=BatchIngestResponse)
 async def ingest_batch(request: BatchIngestRequest):
     """Batch data ingestion pipeline with validation, deduplication, and ELT transformations."""
-    raw_dicts = [trip.model_dump() for trip in request.trips]
+    raw_dicts = [trip.model_dump(mode="json") for trip in request.trips]
     result = await ETLPipeline.run_batch_ingestion(raw_dicts, source_name=request.source_name)
     return result
 
 @router.post("/event")
 async def ingest_single_event(trip: TripCreate):
     """Publish a single trip event directly to Redis Stream / worker queue."""
-    msg_id = await redis_client.publish_event(trip.model_dump())
+    msg_id = await redis_client.publish_event(trip.model_dump(mode="json"))
     return {"status": "published", "stream_id": msg_id, "event": trip}
 
 @router.post("/seed-sample")
@@ -37,4 +37,3 @@ async def seed_sample_data(sample_size: int = Query(default=2000, le=10000)):
     subset = all_trips[:sample_size]
     res = await ETLPipeline.run_batch_ingestion(subset, source_name="seed_sample_generator")
     return {"message": f"Successfully seeded {res['ingested']} trips.", "details": res}
-

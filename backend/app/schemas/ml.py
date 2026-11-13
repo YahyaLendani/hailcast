@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class ForecastPoint(BaseModel):
     timestamp: datetime
@@ -11,7 +11,7 @@ class ForecastPoint(BaseModel):
     actual_demand: Optional[float] = None
 
 class ForecastRequest(BaseModel):
-    horizon_hours: int = 24
+    horizon_hours: int = Field(default=24, ge=1, le=168)
     location_id: Optional[int] = None
     model_name: str = "lightgbm"
 
@@ -31,6 +31,7 @@ class ForecastResponse(BaseModel):
     generated_at: datetime
     metrics: ModelMetrics
     forecasts: List[ForecastPoint]
+    history: List[ForecastPoint] = []
 
 class ModelComparisonResponse(BaseModel):
     models: List[ModelMetrics]

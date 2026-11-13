@@ -58,7 +58,20 @@ async def run_e2e_tests():
     print("=== 6. Anomaly Detection ===")
     anom_results = anomaly_detector.fit_detect(df.to_dict(orient="records"))
     anomalies = [a for a in anom_results if a.get("is_anomaly")]
+    async with AsyncSessionLocal() as session:
+        gold_rows = (await session.execute(select(GoldHourlyDemand))).scalars().all()
+        anom_lookup = {
+            (pd.Timestamp(a["time_bucket"]).to_pydatetime(), int(a["location_id"])): a
+            for a in anom_results
+        }
+        for rec in gold_rows:
+            match = anom_lookup.get((rec.time_bucket, rec.location_id))
+            if match:
+                rec.is_anomaly = bool(match["is_anomaly"])
+                rec.anomaly_score = float(match["anomaly_score"])
+        await session.commit()
     print(f"Detected {len(anomalies)} demand anomalies across historical buckets.")
+    assert len(anomalies) > 0, "Should detect demand anomalies"
 
     print("\n>>> ALL FLOWSIGHT E2E PIPELINE TESTS PASSED SUCCESSFULLY! <<<")
 
