@@ -5,7 +5,7 @@
 Hailcast is an Operate surface: a dashboard read at a desk, in daylight, by data
 engineers and people evaluating the system. The look borrows from printed transit
 graphics (route diagrams, timetables, station signage), not from dark "mission
-control" dashboards. One light theme, no theme switcher.
+control" dashboards. Timetable is the default; three alternates (Dispatch, Harbor, Night shift) override the same tokens via `data-theme` and are picked from the footer or `?theme=`.
 
 The signature is the pipeline drawn as a route line: Replay buffer, Stream, Bronze,
 Silver, Gold are stations on one line with a lettered bullet each. The line shows a
@@ -47,7 +47,7 @@ never reused as series colours.
 - Signage band (ink) holds the wordmark, connection state and the replay clock.
 - The replay bar is sticky and carries the only primary action. A yellow hairline
   along its bottom edge shows replay progress.
-- Five tabs: Demand, Forecast, Anomalies, Data quality, Trips. The tab is kept in
+- Six views: Where to go (default, for dispatchers), Demand, Forecast, Anomalies, Pipeline, Trips. They sit in a sticky side navigation from 1000px up and in a scrolling tab row below that. The view is kept in
   the URL hash.
 - Under 900px the two-column splits stack; under 640px the route line turns
   vertical and the replay bar stops being sticky.

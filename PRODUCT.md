@@ -12,3 +12,10 @@ Hailcast (formerly FlowSight) is an industrial-grade real-time data engineering,
   - Transparent ML model evaluation with guaranteed zero future-data leakage.
   - Sub-second feedback during streaming ingestion and live chart updates.
 
+
+## Primary user: the taxi dispatcher
+The first screen ("Where to go") answers one question for a fleet dispatcher or driver:
+which pickup zones will be busiest in the next 1, 3 or 6 hours, and what they are worth.
+It ranks zones by expected pickups or expected takings, using the city-wide forecast split
+by each zone's usual share at that hour. Engineers find the pipeline, forecast evaluation
+and data-quality views in the side navigation.

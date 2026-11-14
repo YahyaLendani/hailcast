@@ -5,10 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hailcast — NYC taxi demand, streamed and forecast</title>
   <meta name="description" content="Replay NYC taxi trips through a Bronze, Silver, Gold pipeline and forecast hourly demand.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23f6b900'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='sans-serif' font-weight='800' font-size='18' fill='%2316150f'%3EH%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      var allowed = ['paper', 'dispatch', 'harbor', 'night'];
+      var theme = new URLSearchParams(location.search).get('theme');
+      try { theme = theme || localStorage.getItem('hailcast-theme'); } catch (e) {}
+      if (allowed.indexOf(theme) < 1) return;
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
   <style>
     :root {
       --paper: #f3f0e8;
@@ -17,7 +27,12 @@
       --ink-2: #454238;
       --ink-3: #676357;
       --rule: #d8d3c4;
+      --band-bg: #16150f;
       --band-text: #f3f0e8;
+      --on-ink: #f3f0e8;
+      --on-accent: #16150f;
+      --hover: #e9e5d8;
+      --gold: #f6b900;
       --band-muted: #b8b3a4;
       --yellow: #f6b900;
       --yellow-deep: #d99f00;
@@ -31,6 +46,28 @@
       --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
       --gutter: clamp(16px, 4vw, 40px);
     }
+    /* Dispatch: cool white, black and taxi yellow */
+    [data-theme="dispatch"] {
+      --paper: #ffffff; --surface: #f5f6f7; --ink: #0d0e10; --ink-2: #3a3d42; --ink-3: #5f646b;
+      --rule: #dcdfe3; --band-bg: #0d0e10; --band-text: #ffffff; --band-muted: #a9aeb5;
+      --on-ink: #ffffff; --hover: #eceef0;
+    }
+    /* Harbor: navy ink on pale blue-grey, mint accent */
+    [data-theme="harbor"] {
+      --paper: #eef2f6; --surface: #f8fafc; --ink: #0f1d33; --ink-2: #33435c; --ink-3: #566479;
+      --rule: #cfd8e3; --band-bg: #0f1d33; --band-text: #eef2f6; --band-muted: #9fb0c6;
+      --on-ink: #eef2f6; --hover: #e0e7ef;
+      --yellow: #35d6a0; --yellow-deep: #1fb886; --on-accent: #0f1d33;
+    }
+    /* Night shift: dark ground for low-light rooms */
+    [data-theme="night"] {
+      --paper: #101114; --surface: #17181d; --ink: #ecebe6; --ink-2: #c3c1b9; --ink-3: #9c9a92;
+      --rule: #2c2e35; --band-bg: #000000; --band-text: #ecebe6; --band-muted: #9c9a92;
+      --on-ink: #101114; --hover: #22242b;
+      --blue: #4a86e8; --orange: #d9722f; --ok: #4ccb8a; --alert: #f0705e; --silver: #8d929b;
+    }
+    [data-theme="night"] .notice { background: #3a1712; color: #ffd9d2; }
+    [data-theme="night"] .conn[data-state="live"] i { background: #4ccb8a; }
     *, *::before, *::after { box-sizing: border-box; }
     html { scrollbar-color: var(--ink-3) var(--paper); scrollbar-width: thin; }
     body {
@@ -42,7 +79,7 @@
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
     }
-    ::selection { background: var(--yellow); color: var(--ink); }
+    ::selection { background: var(--yellow); color: var(--on-accent); }
     :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 2px; }
     .band :focus-visible { outline-color: var(--yellow); }
     h1, h2, h3, p, dl, dd, ol, ul { margin: 0; padding: 0; }
@@ -54,7 +91,7 @@
 
     /* ---------- Signage band ---------- */
     .band {
-      background: var(--ink);
+      background: var(--band-bg);
       color: var(--band-text);
       padding: 14px var(--gutter);
       display: flex;
@@ -66,7 +103,7 @@
     .bullet {
       width: 34px; height: 34px; border-radius: 50%;
       display: grid; place-items: center;
-      background: var(--yellow); color: var(--ink);
+      background: var(--yellow); color: var(--on-accent);
       font-weight: 800; font-size: 18px; line-height: 1;
       flex: none;
     }
@@ -98,10 +135,10 @@
       display: inline-flex; align-items: center; gap: 8px;
       transition: background .12s, transform .08s;
     }
-    .btn:hover:not(:disabled) { background: #ebe7da; }
+    .btn:hover:not(:disabled) { background: var(--hover); }
     .btn:active:not(:disabled) { transform: translateY(1px); }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
-    .btn-primary { background: var(--yellow); }
+    .btn-primary { background: var(--yellow); color: var(--on-accent); border-color: var(--ink); }
     .btn-primary:hover:not(:disabled) { background: var(--yellow-deep); }
     .btn svg { width: 12px; height: 12px; flex: none; }
     .seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 4px; overflow: hidden; }
@@ -109,9 +146,9 @@
     .seg input { position: absolute; opacity: 0; pointer-events: none; }
     .seg span { display: block; padding: 6px 12px; font-size: 14px; font-weight: 600; min-width: 44px; text-align: center; border-left: 1.5px solid var(--ink); }
     .seg label:first-of-type span { border-left: 0; }
-    .seg input:checked + span { background: var(--ink); color: var(--band-text); }
+    .seg input:checked + span { background: var(--ink); color: var(--on-ink); }
     .seg input:focus-visible + span { outline: 2px solid var(--blue); outline-offset: -4px; }
-    .seg label:hover input:not(:checked) + span { background: #ebe7da; }
+    .seg label:hover input:not(:checked) + span { background: var(--hover); }
     .field-label { font-size: 13px; color: var(--ink-3); margin-right: 8px; }
     .readouts { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 24px; font-size: 13px; color: var(--ink-3); }
     .readouts b { color: var(--ink); font-weight: 600; }
@@ -148,7 +185,7 @@
     }
     .stop.t-bronze { background: var(--bronze); color: #fff; }
     .stop.t-silver { background: var(--silver); color: #fff; }
-    .stop.t-gold { background: var(--yellow); color: var(--ink); }
+    .stop.t-gold { background: var(--gold); color: #16150f; }
     .station-name { margin-top: 10px; font-weight: 700; font-size: 15px; }
     .station-count { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
     .station-note { color: var(--ink-3); font-size: 13px; }
@@ -168,8 +205,8 @@
       padding: 10px 16px; border: 0; background: none; color: var(--ink-2);
       border-radius: 4px 4px 0 0; cursor: pointer;
     }
-    .tab:hover { background: #e9e5d8; color: var(--ink); }
-    .tab[aria-selected="true"] { background: var(--ink); color: var(--band-text); }
+    .tab:hover { background: var(--hover); color: var(--ink); }
+    .tab[aria-selected="true"] { background: var(--ink); color: var(--on-ink); }
     .tab .count { font-weight: 500; opacity: .75; margin-left: 4px; }
     .panel[hidden] { display: none; }
     .panel > .section-head:first-child { border-top: 0; margin-top: 12px; }
@@ -187,7 +224,7 @@
     th { text-align: left; font-weight: 600; font-size: 13px; color: var(--ink-3); padding: 8px 14px 8px 0; border-bottom: 1.5px solid var(--ink); white-space: nowrap; }
     td { padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule); vertical-align: middle; }
     th.r, td.r { text-align: right; padding-right: 0; padding-left: 14px; }
-    tbody tr:hover { background: #ece8dc; }
+    tbody tr:hover { background: var(--hover); }
     .empty { color: var(--ink-3); padding: 28px 0; font-size: 14px; }
     .bar-cell { display: flex; align-items: center; gap: 10px; }
     .bar-cell .bar { height: 8px; border-radius: 0 4px 4px 0; background: var(--blue); min-width: 2px; }
@@ -197,7 +234,7 @@
     .tag.warn::before { background: var(--yellow-deep); }
     .tag.bad::before { background: var(--alert); }
     .best { font-weight: 700; }
-    .best-mark { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 3px; background: var(--yellow); font-size: 12px; font-weight: 700; }
+    .best-mark { display: inline-block; margin-left: 8px; padding: 3px 9px; border-radius: 3px; background: var(--yellow); color: var(--on-accent); font-size: 12px; font-weight: 700; }
 
     /* ---------- Live feed ---------- */
     .feed li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 9px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
@@ -212,7 +249,37 @@
     .imp .bar { height: 8px; border-radius: 0 4px 4px 0; background: var(--orange); min-width: 2px; }
     .imp .v { text-align: right; color: var(--ink-2); }
     .stack > * + * { margin-top: 32px; }
-    footer { padding: 20px var(--gutter) 32px; color: var(--ink-3); font-size: 13px; border-top: 1px solid var(--rule); }
+    footer { padding: 20px var(--gutter) 32px; color: var(--ink-3); font-size: 13px; border-top: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: 12px 32px; justify-content: space-between; align-items: center; }
+    footer p { max-width: 80ch; }
+    .theme-pick { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .theme-pick select { font: inherit; color: var(--ink); background: var(--surface); border: 1.5px solid var(--ink); border-radius: 4px; padding: 7px 12px; }
+
+    /* ---------- Dispatcher view ---------- */
+    .lead { font-size: 22px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; max-width: 44ch; margin-bottom: 8px; text-wrap: balance; }
+    th.rank, td.rank { width: 36px; color: var(--ink-3); }
+    .trend { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .trend svg { width: 10px; height: 10px; flex: none; }
+    .trend.up { color: var(--ok); font-weight: 600; }
+    .trend.down { color: var(--ink-2); }
+    .trend.flat { color: var(--ink-3); }
+    .stack > div:first-child > .section-head:first-child { border-top: 0; margin-top: 12px; }
+
+    /* ---------- Motion ---------- */
+    html { scroll-behavior: smooth; }
+    .panel:not([hidden]) { animation: enter .32s cubic-bezier(.16, 1, .3, 1); }
+    @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .bar-cell .bar, .imp .bar { transition: width .5s cubic-bezier(.16, 1, .3, 1); }
+    .tab, .seg span { transition: background .15s ease-out, color .15s ease-out; }
+    tbody tr { transition: background .12s ease-out; }
+
+    /* ---------- Side navigation on wide screens ---------- */
+    @media (min-width: 1000px) {
+      main { display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 44px; align-items: start; }
+      .notice { grid-column: 1 / -1; grid-row: 1; }
+      .tabs { grid-column: 1; grid-row: 2; flex-direction: column; gap: 2px; border-bottom: 0; overflow: visible; position: sticky; top: 84px; margin-top: 24px; }
+      .tab { display: flex; justify-content: space-between; text-align: left; border-radius: 4px; padding: 9px 12px; }
+      .panel { grid-column: 2; grid-row: 2; min-width: 0; }
+    }
 
     @media (max-width: 900px) {
       .split { grid-template-columns: 1fr; }
@@ -238,7 +305,9 @@
       .chart-box { height: 240px; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .line.running::before, .feed li:first-child { animation: none; }
+      .line.running::before, .feed li:first-child, .panel:not([hidden]) { animation: none; }
+      html { scroll-behavior: auto; }
+      .bar-cell .bar, .imp .bar { transition: none; }
       .replay-progress, .btn { transition: none; }
     }
   </style>
@@ -296,37 +365,47 @@
       <button class="btn" type="button" id="notice-retry">Retry</button>
     </div>
 
-    <div class="section-head">
-      <h2>Pipeline</h2>
-      <p class="hint">Every trip rides the same line: buffered, streamed, stored raw, cleaned, then rolled up by hour.</p>
-    </div>
-    <ol class="line" id="line">
-      <li class="station"><span class="stop" aria-hidden="true">Q</span><p class="station-name">Replay buffer</p><p class="station-count num" id="st-buffer">—</p><p class="station-note">historical trips waiting</p></li>
-      <li class="station"><span class="stop" aria-hidden="true">S</span><p class="station-name">Stream</p><p class="station-count num" id="st-stream">—</p><p class="station-note" id="st-stream-note">events processed</p></li>
-      <li class="station"><span class="stop t-bronze" aria-hidden="true">B</span><p class="station-name">Bronze · raw</p><p class="station-count num" id="st-bronze">—</p><p class="station-note" id="st-bronze-note">immutable log</p></li>
-      <li class="station"><span class="stop t-silver" aria-hidden="true">S</span><p class="station-name">Silver · cleaned</p><p class="station-count num" id="st-silver">—</p><p class="station-note" id="st-silver-note">passed validation</p></li>
-      <li class="station"><span class="stop t-gold" aria-hidden="true">G</span><p class="station-name">Gold · hourly</p><p class="station-count num" id="st-gold">—</p><p class="station-note">zone-hour buckets</p></li>
-    </ol>
-
-    <dl class="figures">
-      <div><dt>Trips</dt><dd class="num" id="f-trips">—</dd></div>
-      <div><dt>Revenue</dt><dd class="num" id="f-revenue">—</dd></div>
-      <div><dt>Average fare</dt><dd class="num" id="f-fare">—</dd></div>
-      <div><dt>Average distance</dt><dd class="num" id="f-dist">—</dd></div>
-      <div><dt>Pickup zones</dt><dd class="num" id="f-zones">—</dd></div>
-      <div><dt>Flagged zone-hours</dt><dd class="num" id="f-anom">—</dd></div>
-    </dl>
 
     <div class="tabs" role="tablist" aria-label="Views">
-      <button class="tab" role="tab" id="tab-demand" aria-controls="panel-demand" aria-selected="true">Demand</button>
+      <button class="tab" role="tab" id="tab-dispatch" aria-controls="panel-dispatch" aria-selected="true">Where to go</button>
+      <button class="tab" role="tab" id="tab-demand" aria-controls="panel-demand" aria-selected="false" tabindex="-1">Demand</button>
       <button class="tab" role="tab" id="tab-forecast" aria-controls="panel-forecast" aria-selected="false" tabindex="-1">Forecast</button>
       <button class="tab" role="tab" id="tab-anomalies" aria-controls="panel-anomalies" aria-selected="false" tabindex="-1">Anomalies<span class="count num" id="tab-anom-count"></span></button>
-      <button class="tab" role="tab" id="tab-quality" aria-controls="panel-quality" aria-selected="false" tabindex="-1">Data quality</button>
+      <button class="tab" role="tab" id="tab-quality" aria-controls="panel-quality" aria-selected="false" tabindex="-1">Pipeline</button>
       <button class="tab" role="tab" id="tab-trips" aria-controls="panel-trips" aria-selected="false" tabindex="-1">Trips</button>
     </div>
 
+    <!-- Where to go -->
+    <section class="panel" role="tabpanel" id="panel-dispatch" aria-labelledby="tab-dispatch">
+      <div class="section-head">
+        <h2>Where to send cabs</h2>
+        <span class="seg" role="radiogroup" aria-label="Planning window">
+          <label><input type="radio" name="horizon" value="1" checked><span>Next hour</span></label>
+          <label><input type="radio" name="horizon" value="3"><span>Next 3 hours</span></label>
+          <label><input type="radio" name="horizon" value="6"><span>Next 6 hours</span></label>
+        </span>
+      </div>
+      <p class="lead" id="outlook-lead">Working out where demand is heading…</p>
+      <p class="hint" id="outlook-window"></p>
+
+      <div class="section-head">
+        <h2>Every zone, ranked</h2>
+        <span class="seg" role="radiogroup" aria-label="Rank zones by">
+          <label><input type="radio" name="rank" value="expected_pickups" checked><span>Most pickups</span></label>
+          <label><input type="radio" name="rank" value="expected_revenue"><span>Most takings</span></label>
+        </span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="rank">#</th><th>Zone</th><th>Expected pickups</th><th>Against last hour</th><th class="r">Average per trip</th><th class="r">Expected takings</th></tr></thead>
+          <tbody id="outlook-body"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <p class="hint" id="outlook-note" style="margin-top:12px"></p>
+    </section>
+
     <!-- Demand -->
-    <section class="panel" role="tabpanel" id="panel-demand" aria-labelledby="tab-demand">
+    <section class="panel" role="tabpanel" id="panel-demand" aria-labelledby="tab-demand" hidden>
       <div class="split">
         <div>
           <div class="section-head">
@@ -414,6 +493,28 @@
     <section class="panel" role="tabpanel" id="panel-quality" aria-labelledby="tab-quality" hidden>
       <div class="stack">
         <div>
+    <div class="section-head">
+      <h2>Pipeline</h2>
+      <p class="hint">Every trip rides the same line: buffered, streamed, stored raw, cleaned, then rolled up by hour.</p>
+    </div>
+    <ol class="line" id="line">
+      <li class="station"><span class="stop" aria-hidden="true">Q</span><p class="station-name">Replay buffer</p><p class="station-count num" id="st-buffer">—</p><p class="station-note">historical trips waiting</p></li>
+      <li class="station"><span class="stop" aria-hidden="true">S</span><p class="station-name">Stream</p><p class="station-count num" id="st-stream">—</p><p class="station-note" id="st-stream-note">events processed</p></li>
+      <li class="station"><span class="stop t-bronze" aria-hidden="true">B</span><p class="station-name">Bronze · raw</p><p class="station-count num" id="st-bronze">—</p><p class="station-note" id="st-bronze-note">immutable log</p></li>
+      <li class="station"><span class="stop t-silver" aria-hidden="true">S</span><p class="station-name">Silver · cleaned</p><p class="station-count num" id="st-silver">—</p><p class="station-note" id="st-silver-note">passed validation</p></li>
+      <li class="station"><span class="stop t-gold" aria-hidden="true">G</span><p class="station-name">Gold · hourly</p><p class="station-count num" id="st-gold">—</p><p class="station-note">zone-hour buckets</p></li>
+    </ol>
+
+    <dl class="figures">
+      <div><dt>Trips</dt><dd class="num" id="f-trips">—</dd></div>
+      <div><dt>Revenue</dt><dd class="num" id="f-revenue">—</dd></div>
+      <div><dt>Average fare</dt><dd class="num" id="f-fare">—</dd></div>
+      <div><dt>Average distance</dt><dd class="num" id="f-dist">—</dd></div>
+      <div><dt>Pickup zones</dt><dd class="num" id="f-zones">—</dd></div>
+      <div><dt>Flagged zone-hours</dt><dd class="num" id="f-anom">—</dd></div>
+    </dl>
+        </div>
+        <div>
           <div class="section-head">
             <h2>Stream backend</h2>
           </div>
@@ -455,7 +556,17 @@
     </section>
   </main>
 
-  <footer>Hailcast replays a synthetic sample shaped like NYC TLC yellow-taxi records. Times shown are replayed trip times, not the current time.</footer>
+  <footer>
+    <p>Hailcast replays a synthetic sample shaped like NYC TLC yellow-taxi records. Times shown are replayed trip times, not the current time.</p>
+    <label class="theme-pick">Design
+      <select id="theme-select">
+        <option value="paper">Timetable (default)</option>
+        <option value="dispatch">Dispatch</option>
+        <option value="harbor">Harbor</option>
+        <option value="night">Night shift</option>
+      </select>
+    </label>
+  </footer>
 
   <script>
   (() => {
@@ -488,13 +599,30 @@
     function showNotice(text) { $('notice-text').textContent = text; $('notice').hidden = false; }
     function clearNotice() { $('notice').hidden = true; }
 
+    /* ---------- Motion ---------- */
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const int = v => nf.format(Math.round(v));
+    function tween(el, to, fmt = int) {
+      const from = el._v ?? to;
+      el._v = to;
+      cancelAnimationFrame(el._raf);
+      if (reduce || from === to || document.hidden) { el.textContent = fmt(to); return; }
+      const t0 = performance.now();
+      const step = now => {
+        const k = Math.min(1, (now - t0) / 450), e = 1 - Math.pow(1 - k, 3);
+        el.textContent = fmt(from + (to - from) * e);
+        if (k < 1) el._raf = requestAnimationFrame(step);
+      };
+      el._raf = requestAnimationFrame(step);
+    }
+
     /* ---------- Charts ---------- */
     Chart.defaults.font.family = css('--sans');
     Chart.defaults.font.size = 12;
     Chart.defaults.color = css('--ink-3');
-    Chart.defaults.animation = false;
+    Chart.defaults.animation = reduce ? false : { duration: 350, easing: 'easeOutQuart' };
     const grid = { color: css('--rule'), drawTicks: false };
-    const tooltip = { backgroundColor: css('--ink'), titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 4, displayColors: true, boxPadding: 4 };
+    const tooltip = { backgroundColor: css('--ink'), titleColor: css('--on-ink'), bodyColor: css('--on-ink'), padding: 10, cornerRadius: 4, displayColors: true, boxPadding: 4 };
     const xTicks = () => ({ maxRotation: 0, autoSkip: true, maxTicksLimit: 8, callback(_, i) { return tickFmt.format(new Date(this.chart.data.labels[i])); } });
 
     function demandChart(rows) {
@@ -554,7 +682,7 @@
         datasets: [
           { label: 'Observed', data: [...hist.map(p => p.actual_demand), ...fut.map(() => null)], borderColor: blue, backgroundColor: blue, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.25 },
           { label: 'LightGBM forecast', data: [...lead(lastActual), ...fut.map(p => p.predicted_demand)], borderColor: orange, backgroundColor: orange, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.25 },
-          { label: 'Range high', data: [...lead(lastActual), ...fut.map(p => p.upper_bound)], borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '+1', backgroundColor: 'rgba(176, 72, 14, 0.16)', tension: 0.25 },
+          { label: 'Range high', data: [...lead(lastActual), ...fut.map(p => p.upper_bound)], borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '+1', backgroundColor: orange + '29', tension: 0.25 },
           { label: 'Range low', data: [...lead(lastActual), ...fut.map(p => p.lower_bound)], borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, tension: 0.25 },
           { label: 'Typical for that hour', data: [...pad, ...fut.map(p => p.baseline_demand)], borderColor: css('--ink-3'), backgroundColor: css('--ink-3'), borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, pointHoverRadius: 3, tension: 0.25 }
         ]
@@ -583,8 +711,8 @@
     /* ---------- Loaders ---------- */
     async function loadSummary() {
       const [ov, health] = await Promise.all([api('/analytics/overview'), api('/health/')]);
-      $('f-trips').textContent = nf.format(ov.total_trips);
-      $('f-revenue').textContent = usd0.format(ov.total_revenue);
+      tween($('f-trips'), ov.total_trips);
+      tween($('f-revenue'), ov.total_revenue, v => usd0.format(v));
       $('f-fare').textContent = usd.format(ov.avg_fare);
       $('f-dist').textContent = `${n1.format(ov.avg_trip_distance)} mi`;
       $('f-zones').textContent = nf.format(ov.active_pickup_zones);
@@ -592,13 +720,13 @@
       $('tab-anom-count').textContent = ov.total_anomalies ? ` ${nf.format(ov.total_anomalies)}` : '';
 
       const db = health.database, st = health.streaming;
-      $('st-stream').textContent = nf.format(st.total_streamed_events);
+      tween($('st-stream'), st.total_streamed_events);
       $('st-stream-note').textContent = st.deduplicated_in_stream ? `events processed · ${nf.format(st.deduplicated_in_stream)} duplicates skipped` : 'events processed this session';
-      $('st-bronze').textContent = nf.format(db.raw_trips_bronze);
-      $('st-silver').textContent = nf.format(db.silver_trips_cleaned);
+      tween($('st-bronze'), db.raw_trips_bronze);
+      tween($('st-silver'), db.silver_trips_cleaned);
       const rejected = db.raw_trips_bronze - db.silver_trips_cleaned;
       $('st-silver-note').textContent = rejected > 0 ? `${nf.format(rejected)} failed validation` : 'all rows passed validation';
-      $('st-gold').textContent = nf.format(db.gold_hourly_analytics);
+      tween($('st-gold'), db.gold_hourly_analytics);
       if (!(state.replay.is_active && !state.replay.is_paused)) $('eps').textContent = '0';
 
       $('backend-line').textContent = st.backend === 'redis_streams'
@@ -713,6 +841,51 @@
       }
     }
 
+    const timeFmt = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const ARROW = { up: 'M5 1l4 6H1z', down: 'M5 9L1 3h8z' };
+    const checked = name => document.querySelector(`input[name="${name}"]:checked`).value;
+    let outlookAt = 0;
+    async function loadOutlook() {
+      outlookAt = Date.now();
+      try {
+        state.outlook = await api(`/ml/zone-outlook?horizon_hours=${checked('horizon')}`);
+      } catch (err) {
+        state.outlook = null;
+        $('outlook-lead').textContent = `No outlook yet. ${err.message}`;
+        $('outlook-window').textContent = '';
+        $('outlook-note').textContent = '';
+        $('outlook-body').innerHTML = `<tr><td colspan="6" class="empty">Start the replay or seed sample data, then come back.</td></tr>`;
+        return;
+      }
+      renderOutlook();
+    }
+    function renderOutlook() {
+      const o = state.outlook;
+      if (!o) return;
+      const key = checked('rank'), h = o.horizon_hours;
+      const zones = o.zones.slice().sort((a, b) => b[key] - a[key]);
+      const span = `${timeFmt.format(new Date(o.window_start))} and ${timeFmt.format(new Date(o.window_end))}`;
+      const top = zones[0], next = zones.slice(1, 3).map(z => z.zone_name);
+      $('outlook-lead').textContent = top
+        ? `Send cabs to ${top.zone_name} first: about ${Math.round(top.expected_pickups)} pickups expected between ${span}, worth roughly ${usd0.format(top.expected_revenue)}.${next.length === 2 ? ` Then ${next[0]} and ${next[1]}.` : ''}`
+        : 'No zones have trips yet.';
+      $('outlook-window').textContent = `Planning for ${hourFmt.format(new Date(o.window_start))} to ${timeFmt.format(new Date(o.window_end))}, replayed time. About ${int(o.citywide_expected)} pickups expected city-wide.`;
+      const max = Math.max(1, ...zones.map(z => z.expected_pickups));
+      $('outlook-body').innerHTML = zones.map((z, i) => {
+        const diff = z.expected_pickups / h - z.last_hour_pickups;
+        const dir = Math.abs(diff) < 0.75 ? 'flat' : diff > 0 ? 'up' : 'down';
+        const trend = dir === 'flat' ? 'Steady'
+          : `<svg viewBox="0 0 10 10" aria-hidden="true"><path d="${ARROW[dir]}" fill="currentColor"/></svg>${dir === 'up' ? 'Up' : 'Down'} ${n1.format(Math.abs(diff))} an hour`;
+        return `<tr><td class="rank num">${i + 1}</td><td>${esc(z.zone_name)}</td>
+          <td><div class="bar-cell"><span class="num" style="min-width:5ch">${n1.format(z.expected_pickups)}</span><span class="bar" style="width:${(z.expected_pickups / max * 60).toFixed(1)}%"></span></div></td>
+          <td><span class="trend ${dir}">${trend}</span></td>
+          <td class="r num">${usd.format(z.avg_revenue_per_trip)}</td><td class="r num">${usd0.format(z.expected_revenue)}</td></tr>`;
+      }).join('');
+      $('outlook-note').textContent = `How this is worked out: the city-wide forecast for each hour is split by each zone's usual share of trips at that time of day, learned from ${int(o.history_hours)} hours of history. The city-wide forecast is typically off by about ${n1.format(o.typical_error_per_hour)} trips an hour, so treat close rankings as a tie.`;
+    }
+    document.querySelectorAll('input[name="horizon"]').forEach(el => el.addEventListener('change', () => guard(loadOutlook())));
+    document.querySelectorAll('input[name="rank"]').forEach(el => el.addEventListener('change', renderOutlook));
+
     async function loadStatus() {
       applyReplay(await api('/stream/status'));
     }
@@ -732,7 +905,7 @@
       $('btn-stop').disabled = !r.is_active;
       $('line').classList.toggle('running', running);
       if (!running) $('eps').textContent = '0';
-      $('replayed').textContent = nf.format(r.events_replayed || 0);
+      tween($('replayed'), r.events_replayed || 0);
       $('buffer').textContent = state.total ? nf.format(state.total) : '—';
       $('st-buffer').textContent = state.total ? nf.format(Math.max(0, state.total - (r.events_replayed || 0))) : '—';
       $('progress').style.width = state.total ? `${Math.min(100, (r.events_replayed || 0) / state.total * 100)}%` : '0';
@@ -772,8 +945,9 @@
     }
 
     /* ---------- Tabs ---------- */
-    const TABS = ['demand', 'forecast', 'anomalies', 'quality', 'trips'];
+    const TABS = ['dispatch', 'demand', 'forecast', 'anomalies', 'quality', 'trips'];
     const tabLoaders = {
+      dispatch: loadOutlook,
       demand: () => Promise.all([loadSeries(), loadZones()]),
       forecast: () => Promise.all([loadModels(), loadForecast()]),
       anomalies: loadAnomalies,
@@ -781,7 +955,7 @@
       trips: loadTrips
     };
     function selectTab(name, focus) {
-      if (!TABS.includes(name)) name = 'demand';
+      if (!TABS.includes(name)) name = 'dispatch';
       state.tab = name;
       TABS.forEach(t => {
         const on = t === name, btn = $(`tab-${t}`);
@@ -797,8 +971,8 @@
       const btn = $(`tab-${t}`);
       btn.addEventListener('click', () => selectTab(t));
       btn.addEventListener('keydown', e => {
-        if (e.key === 'ArrowRight') selectTab(TABS[(i + 1) % TABS.length], true);
-        else if (e.key === 'ArrowLeft') selectTab(TABS[(i - 1 + TABS.length) % TABS.length], true);
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); selectTab(TABS[(i + 1) % TABS.length], true); }
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); selectTab(TABS[(i - 1 + TABS.length) % TABS.length], true); }
       });
     });
 
@@ -817,6 +991,7 @@
       const jobs = [loadSummary()];
       if (state.tab === 'demand') jobs.push(loadSeries(), loadZones());
       if (state.tab === 'trips') jobs.push(loadTrips());
+      if (state.tab === 'dispatch' && Date.now() - outlookAt > 6000) jobs.push(loadOutlook());
       guard(Promise.all(jobs));
     }
     $('notice-retry').addEventListener('click', () => { refresh(true); guard(tabLoaders[state.tab]()); });
@@ -827,7 +1002,7 @@
       try {
         await api('/ml/train', { method: 'POST' });
         clearNotice();
-        await Promise.all([loadModels(), loadForecast(), loadSummary()]);
+        await Promise.all([loadModels(), loadForecast(), loadSummary(), loadOutlook()]);
       } catch (err) {
         showNotice(`Training did not run. ${err.message}`);
       } finally {
@@ -862,10 +1037,26 @@
       ws.onerror = () => ws.close();
     }
 
+    /* ---------- Design picker ---------- */
+    const themeSelect = $('theme-select');
+    themeSelect.value = document.documentElement.dataset.theme || 'paper';
+    themeSelect.addEventListener('change', () => {
+      const next = themeSelect.value;
+      if (next === 'paper') delete document.documentElement.dataset.theme;
+      else document.documentElement.dataset.theme = next;
+      try { localStorage.setItem('hailcast-theme', next); } catch (_) {}
+      const url = new URL(location.href);
+      const hadQuery = url.searchParams.has('theme') || url.searchParams.has('v');
+      url.searchParams.delete('theme');
+      url.searchParams.delete('v');
+      if (hadQuery) location.replace(url);
+      else location.reload();
+    });
+
     /* ---------- Boot ---------- */
     (async () => {
       await guard(Promise.all([loadZones(), loadStatus(), loadSummary()]));
-      selectTab(location.hash.slice(1) || 'demand');
+      selectTab(location.hash.slice(1) || 'dispatch');
       connect();
       setInterval(() => { if (!state.replay.is_active || state.replay.is_paused) refresh(false); loadStatus().catch(() => {}); }, 10000);
     })();

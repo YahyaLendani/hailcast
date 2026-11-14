@@ -174,3 +174,79 @@ async def get_anomalies(db: AsyncSession = Depends(get_db)):
         for r in records
     ]
 
+
+@router.get("/zone-outlook")
+async def get_zone_outlook(
+    horizon_hours: int = Query(1, ge=1, le=12, description="Hours ahead to plan for"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Expected pickups per zone for the coming hours, for deciding where to send cabs.
+
+    The city-wide LightGBM forecast for each coming hour is split across zones by
+    each zone's historical share of trips at that hour of day.
+    """
+    from app.api.routes.analytics import ZONE_NAMES
+
+    res = await db.execute(
+        select(
+            GoldHourlyDemand.time_bucket, GoldHourlyDemand.location_id,
+            GoldHourlyDemand.trip_count, GoldHourlyDemand.total_revenue
+        ).order_by(GoldHourlyDemand.time_bucket.asc())
+    )
+    df = pd.DataFrame([tuple(r) for r in res.all()], columns=["time_bucket", "location_id", "trip_count", "total_revenue"])
+    if df.empty:
+        raise HTTPException(status_code=400, detail="No demand data yet. Seed sample data or start the replay first.")
+    df["time_bucket"] = pd.to_datetime(df["time_bucket"])
+
+    model_file = settings.MODEL_DIR / "lightgbm_demand_forecaster.joblib"
+    metrics, _best = _latest_metrics()
+    try:
+        if not metrics or not model_file.exists():
+            train_and_evaluate(df[["time_bucket", "trip_count"]])
+            metrics, _best = _latest_metrics()
+        result = forecast_citywide(df[["time_bucket", "trip_count"]], horizon_hours)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    steps = result["steps"]
+    lgb = next((m for m in metrics if m.model_name == "LightGBM_Forecaster"), metrics[0])
+    last_hour = pd.Timestamp(steps[0]["timestamp"]) - pd.Timedelta(hours=1)
+
+    # Only complete hours feed the shares, matching what the forecast was built on
+    hist = df[df["time_bucket"] <= last_hour]
+    hour_of_day = hist["time_bucket"].dt.hour
+    zone_hour = hist.groupby([hour_of_day, "location_id"])["trip_count"].sum()
+    hour_total = hist.groupby(hour_of_day)["trip_count"].sum()
+    zone_total = hist.groupby("location_id")["trip_count"].sum()
+    zone_revenue = hist.groupby("location_id")["total_revenue"].sum()
+    all_trips = float(zone_total.sum()) or 1.0
+    last_counts = hist[hist["time_bucket"] == last_hour].set_index("location_id")["trip_count"]
+
+    zones = []
+    for zone_id, trips in zone_total.items():
+        expected = 0.0
+        for step in steps:
+            hour = step["timestamp"].hour
+            total = float(hour_total.get(hour, 0.0))
+            share = float(zone_hour.get((hour, zone_id), 0.0)) / total if total > 0 else float(trips) / all_trips
+            expected += step["predicted"] * share
+        per_trip = float(zone_revenue.get(zone_id, 0.0)) / float(trips) if trips else 0.0
+        zones.append({
+            "location_id": int(zone_id),
+            "zone_name": ZONE_NAMES.get(int(zone_id), f"Zone {int(zone_id)}"),
+            "expected_pickups": round(expected, 1),
+            "last_hour_pickups": int(last_counts.get(zone_id, 0)),
+            "avg_revenue_per_trip": round(per_trip, 2),
+            "expected_revenue": round(expected * per_trip, 2),
+        })
+    zones.sort(key=lambda z: z["expected_pickups"], reverse=True)
+
+    return {
+        "horizon_hours": horizon_hours,
+        "window_start": steps[0]["timestamp"].isoformat(),
+        "window_end": (pd.Timestamp(steps[-1]["timestamp"]) + pd.Timedelta(hours=1)).isoformat(),
+        "citywide_expected": round(sum(s["predicted"] for s in steps), 1),
+        "typical_error_per_hour": lgb.mae,
+        "history_hours": int(hist["time_bucket"].nunique()),
+        "zones": zones,
+    }
