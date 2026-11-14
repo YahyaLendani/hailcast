@@ -111,7 +111,8 @@ class ReplayEngine:
             "speed_multiplier": self.speed_multiplier,
             "events_replayed": self.events_replayed,
             "current_simulated_time": self.current_simulated_time.isoformat() if self.current_simulated_time else None,
-            "queue_depth": len(self._dataset_buffer)
+            "queue_depth": len(self._dataset_buffer),
+            "total_buffered": len(self._dataset_buffer)
         }
 
 replay_engine = ReplayEngine()

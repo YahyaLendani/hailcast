@@ -143,8 +143,12 @@ class ETLPipeline:
         """SQL Transformations: Aggregate Silver trips into Gold hourly analytical tables."""
         async with AsyncSessionLocal() as session:
             # Query silver aggregated by hour and pickup location
+            if session.bind.dialect.name == "sqlite":
+                hour_bucket = func.strftime('%Y-%m-%d %H:00:00', SilverTrip.pickup_datetime)
+            else:
+                hour_bucket = func.date_trunc('hour', SilverTrip.pickup_datetime)
             query = select(
-                func.strftime('%Y-%m-%d %H:00:00', SilverTrip.pickup_datetime).label("time_bucket"),
+                hour_bucket.label("time_bucket"),
                 SilverTrip.pickup_location_id.label("location_id"),
                 func.count(SilverTrip.id).label("trip_count"),
                 func.sum(SilverTrip.passenger_count).label("total_passengers"),
@@ -158,7 +162,7 @@ class ETLPipeline:
             rows = res.fetchall()
 
             for r in rows:
-                bucket_dt = datetime.fromisoformat(r.time_bucket)
+                bucket_dt = r.time_bucket if isinstance(r.time_bucket, datetime) else datetime.fromisoformat(r.time_bucket)
                 loc_id = int(r.location_id)
 
                 existing = await session.execute(

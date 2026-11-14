@@ -4,7 +4,7 @@ from app.core.config import settings
 
 
 class Base(DeclarativeBase):
-    """Declarative base for FlowSight SQLAlchemy ORM models."""
+    """Declarative base for Hailcast SQLAlchemy ORM models."""
     pass
 
 

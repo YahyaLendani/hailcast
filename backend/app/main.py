@@ -14,15 +14,36 @@ from app.services.broadcaster import broadcaster
 from app.services.streaming_worker import streaming_worker
 from app.services.replay_engine import replay_engine
 from app.services.etl_pipeline import ETLPipeline
+from app.services.scheduler import scheduler
 from app.api.routes import ingestion, streaming, analytics, ml, health
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-logger = logging.getLogger("FlowSight")
+logger = logging.getLogger("hailcast")
+
+GOLD_REBUILD_INTERVAL_SECONDS = 300
+
+
+async def rebuild_gold_from_silver():
+    """Scheduled job: recompute the Gold hourly table from Silver.
+
+    The stream updates Gold incrementally; this periodic full recompute corrects
+    any drift (for example after a dead-lettered or partially applied batch).
+    """
+    async with streaming_worker.write_lock:
+        await ETLPipeline.run_gold_transformations()
+
+
+scheduler.add_job(
+    "gold_rebuild",
+    "Recompute Gold hourly demand from Silver",
+    GOLD_REBUILD_INTERVAL_SECONDS,
+    rebuild_gold_from_silver,
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting FlowSight platform...")
+    logger.info("Starting Hailcast...")
     await init_db()
     await redis_client.connect()
     await streaming_worker.start()
@@ -46,10 +67,13 @@ async def lifespan(app: FastAPI):
                 await ETLPipeline.run_batch_ingestion(trips[:1500], source_name="initial_seed")
                 logger.info("Initial seed complete.")
 
+    scheduler.start()
+
     yield
 
     # Shutdown
-    logger.info("Shutting down FlowSight platform...")
+    logger.info("Shutting down Hailcast...")
+    await scheduler.stop()
     replay_engine.stop()
     await streaming_worker.stop()
     await redis_client.disconnect()

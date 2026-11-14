@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Local runtime state (the app recreates and reseeds the database on start)
+*.db
+*.db-journal
+.env
+
+# Node / Next.js
+node_modules/
+.next/
+
+# Editor and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local tool settings (machine-specific paths)
+.claude/

@@ -52,7 +52,10 @@ services:
     ports:
       - "8000:8000"
 
+  # Optional standalone stream worker. The API already runs one in-process,
+  # so this only starts with: docker compose --profile worker up
   worker:
+    profiles: ["worker"]
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -69,7 +72,10 @@ services:
       - SYNC_DATABASE_URL=postgresql://flowsight_user:flowsight_password@postgres:5432/flowsight_db
       - REDIS_URL=redis://redis:6379/0
 
+  # Earlier Next.js prototype. Its image does not build yet, so it only
+  # starts with: docker compose --profile next up
   frontend:
+    profiles: ["next"]
     build:
       context: ./frontend
       dockerfile: Dockerfile

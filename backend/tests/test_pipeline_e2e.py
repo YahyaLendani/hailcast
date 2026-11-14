@@ -1,7 +1,6 @@
-import asyncio
 import json
-import os
 import pandas as pd
+from conftest import run  # isolates the database; must come before app imports
 from sqlalchemy import select, delete
 from app.core.database import init_db, AsyncSessionLocal
 from app.core.config import settings
@@ -73,7 +72,11 @@ async def run_e2e_tests():
     print(f"Detected {len(anomalies)} demand anomalies across historical buckets.")
     assert len(anomalies) > 0, "Should detect demand anomalies"
 
-    print("\n>>> ALL FLOWSIGHT E2E PIPELINE TESTS PASSED SUCCESSFULLY! <<<")
+    print("\n>>> ALL HAILCAST E2E PIPELINE TESTS PASSED SUCCESSFULLY! <<<")
+
+def test_pipeline_e2e():
+    run(run_e2e_tests())
+
 
 if __name__ == "__main__":
-    asyncio.run(run_e2e_tests())
+    run(run_e2e_tests())

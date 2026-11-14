@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections import deque
 from datetime import datetime
 from typing import Dict, Any, List, Set, Tuple
 from sqlalchemy import select
@@ -11,8 +12,18 @@ from app.services.broadcaster import broadcaster
 
 logger = logging.getLogger(__name__)
 
+MAX_ATTEMPTS = 3            # tries per batch before it is split or dead-lettered
+BACKOFF_BASE_SECONDS = 0.25  # doubled after every failed try
+# A malformed event fails the same way every time, so it is not retried.
+PERMANENT_ERRORS = (KeyError, ValueError, TypeError)
+
+
 class StreamingWorker:
     def __init__(self):
+        self.retried_count = 0
+        self.dead_letters = deque(maxlen=200)
+        # Held while Gold rows are written, so the scheduled rebuild cannot interleave.
+        self.write_lock = asyncio.Lock()
         self.is_running = False
         self._task = None
         self.processed_count = 0
@@ -44,7 +55,7 @@ class StreamingWorker:
             try:
                 events = await redis_client.read_events(count=25, block_ms=500)
                 if events:
-                    await self._process_batch(events)
+                    await self._process_with_retry(events)
                 else:
                     await asyncio.sleep(0.1)
 
@@ -62,8 +73,50 @@ class StreamingWorker:
                 logger.error("Streaming worker loop error: %s", e)
                 await asyncio.sleep(0.5)
 
+    async def _process_with_retry(self, events: List[Dict[str, Any]]):
+        """Process a batch, retrying with exponential backoff.
+
+        Processing is idempotent (event_id check), so a retry never double-counts.
+        If the batch still fails it is split into single events so one bad event
+        cannot take its neighbours down; an event that fails alone is dead-lettered.
+        Events are acknowledged on the stream only once they are stored or dead-lettered.
+        """
+        error = None
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            try:
+                await self._process_batch(events)
+                await redis_client.ack_events(events)
+                return
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                error = exc
+                if isinstance(exc, PERMANENT_ERRORS) or attempt == MAX_ATTEMPTS:
+                    break
+                self.retried_count += 1
+                delay = BACKOFF_BASE_SECONDS * 2 ** (attempt - 1)
+                logger.warning("Batch of %d failed (try %d of %d): %s. Retrying in %.2fs",
+                               len(events), attempt, MAX_ATTEMPTS, exc, delay)
+                await asyncio.sleep(delay)
+
+        if len(events) > 1:
+            logger.warning("Batch of %d still failing (%s). Processing its events one by one.", len(events), error)
+            for event in events:
+                await self._process_with_retry([event])
+            return
+
+        self.failed_count += 1
+        self.dead_letters.append({
+            "stream_id": events[0].get("stream_id"),
+            "error": f"{type(error).__name__}: {error}",
+            "failed_at": datetime.utcnow().isoformat(),
+            "payload": events[0].get("payload"),
+        })
+        logger.error("Event %s dead-lettered: %s", events[0].get("stream_id"), error)
+        await redis_client.ack_events(events)
+
     async def _process_batch(self, events: List[Dict[str, Any]]):
-        async with AsyncSessionLocal() as session:
+        async with self.write_lock, AsyncSessionLocal() as session:
             # AsyncSessionLocal uses autoflush=False, so track pending event_ids and
             # GoldHourlyDemand (time_bucket, location_id) rows within the current batch
             # to prevent intra-batch duplicate INSERT UNIQUE constraint violations.
@@ -188,9 +241,30 @@ class StreamingWorker:
                         "sample": latest.get("data", latest)
                     })
 
-            except Exception as e:
+            except Exception:
                 await session.rollback()
-                logger.error("Error committing streaming batch: %s", e)
-                self.failed_count += len(events)
+                raise
+
 
 streaming_worker = StreamingWorker()
+
+
+async def _run_standalone():
+    """Run the worker as its own process (the docker-compose `worker` service)."""
+    from app.core.database import init_db
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    await init_db()
+    await redis_client.connect()
+    await streaming_worker.start()
+    try:
+        await asyncio.Event().wait()
+    finally:
+        await streaming_worker.stop()
+        await redis_client.disconnect()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(_run_standalone())
+    except KeyboardInterrupt:
+        pass

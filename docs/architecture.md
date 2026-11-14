@@ -1,11 +1,11 @@
-# FlowSight Architecture & System Design
+# Hailcast Architecture & System Design
 
-FlowSight is a data engineering and predictive analytics platform engineered to demonstrate the end-to-end lifecycle of a modern streaming and analytical data system.
+Hailcast is a data engineering and predictive analytics platform engineered to demonstrate the end-to-end lifecycle of a modern streaming and analytical data system.
 
 ```mermaid
 flowchart TD
     subgraph INGESTION ["1. Ingestion Layer"]
-        A1[NYC TLC Taxi Trip Records] -->|Controlled Replay| B1[Replay Engine]
+        A1[Synthetic trip sample, TLC-shaped] -->|Controlled Replay| B1[Replay Engine]
         A2[External Clients / APIs] -->|Batch Upload| B2[FastAPI Ingestion Endpoint]
         B1 -->|Replayed Events| C1[Redis Streams]
         B2 -->|Batch Payloads| C2[ETL Batch Pipeline]

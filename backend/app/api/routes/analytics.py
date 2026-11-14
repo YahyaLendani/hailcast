@@ -91,32 +91,70 @@ async def get_top_zones(limit: int = Query(10, le=50), db: AsyncSession = Depend
 async def get_trips(
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
+    location_id: Optional[int] = Query(None, description="Pickup zone filter"),
+    payment_type: Optional[str] = Query(None, description="Payment type filter"),
+    start: Optional[datetime] = Query(None, description="Earliest pickup time (inclusive)"),
+    end: Optional[datetime] = Query(None, description="Latest pickup time (inclusive)"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Explore cleaned historical trip records."""
-    query = select(SilverTrip).order_by(SilverTrip.pickup_datetime.desc()).offset(offset).limit(limit)
+    """Explore cleaned historical trip records, newest first."""
+    query = select(SilverTrip)
+    if location_id is not None:
+        query = query.where(SilverTrip.pickup_location_id == location_id)
+    if payment_type:
+        query = query.where(SilverTrip.payment_type == payment_type)
+    if start is not None:
+        query = query.where(SilverTrip.pickup_datetime >= start)
+    if end is not None:
+        query = query.where(SilverTrip.pickup_datetime <= end)
+    query = query.order_by(SilverTrip.pickup_datetime.desc()).offset(offset).limit(limit)
     res = await db.execute(query)
     return res.scalars().all()
 
 
+@router.get("/filters")
+async def get_filter_options(db: AsyncSession = Depends(get_db)):
+    """Values the dashboard can filter by: pickup zones, payment types and the date span."""
+    zone_ids = (await db.execute(select(SilverTrip.pickup_location_id).distinct())).scalars().all()
+    payments = (await db.execute(select(SilverTrip.payment_type).distinct())).scalars().all()
+    first, last = (await db.execute(
+        select(func.min(SilverTrip.pickup_datetime), func.max(SilverTrip.pickup_datetime))
+    )).one()
+    zones = sorted(
+        ({"location_id": z, "zone_name": ZONE_NAMES.get(z, f"Zone {z}")} for z in zone_ids if z is not None),
+        key=lambda z: z["zone_name"],
+    )
+    return {
+        "zones": zones,
+        "payment_types": sorted(p for p in payments if p),
+        "first_pickup": first.isoformat() if first else None,
+        "last_pickup": last.isoformat() if last else None,
+    }
+
 
 @router.get("/demand-series")
 async def get_demand_series(
-    hours: int = Query(72, ge=1, le=336, description="Most recent hours to return"),
+    hours: int = Query(72, ge=1, le=336, description="Most recent hours to return when no dates are given"),
+    location_id: Optional[int] = Query(None, description="Pickup zone filter"),
+    start: Optional[datetime] = Query(None, description="Earliest hour (inclusive)"),
+    end: Optional[datetime] = Query(None, description="Latest hour (inclusive)"),
     db: AsyncSession = Depends(get_db)
 ):
-    """City-wide hourly demand (all zones summed) for the most recent hours, oldest first."""
-    query = (
-        select(
-            GoldHourlyDemand.time_bucket,
-            func.sum(GoldHourlyDemand.trip_count),
-            func.sum(GoldHourlyDemand.total_revenue),
-            func.sum(func.coalesce(GoldHourlyDemand.is_anomaly, False)),
-        )
-        .group_by(GoldHourlyDemand.time_bucket)
-        .order_by(GoldHourlyDemand.time_bucket.desc())
-        .limit(hours)
+    """Hourly demand, oldest first: all zones summed, or one zone when location_id is given."""
+    query = select(
+        GoldHourlyDemand.time_bucket,
+        func.sum(GoldHourlyDemand.trip_count),
+        func.sum(GoldHourlyDemand.total_revenue),
+        func.sum(func.coalesce(GoldHourlyDemand.is_anomaly, False)),
     )
+    if location_id is not None:
+        query = query.where(GoldHourlyDemand.location_id == location_id)
+    if start is not None:
+        query = query.where(GoldHourlyDemand.time_bucket >= start)
+    if end is not None:
+        query = query.where(GoldHourlyDemand.time_bucket <= end)
+    limit = 336 if (start is not None or end is not None) else hours
+    query = query.group_by(GoldHourlyDemand.time_bucket).order_by(GoldHourlyDemand.time_bucket.desc()).limit(limit)
     rows = (await db.execute(query)).all()
     return [
         {

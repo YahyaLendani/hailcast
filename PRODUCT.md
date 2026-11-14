@@ -1,7 +1,7 @@
 # Hailcast Product Specification
 
 ## Mission & Purpose
-Hailcast (formerly FlowSight) is an industrial-grade real-time data engineering, event replay, and predictive analytics platform for urban transportation and mobility intelligence. It demonstrates the complete lifecycle of a mission-critical distributed data system: high-throughput stream ingestion, deterministic deduplication, Medallion data tiering (Bronze -> Silver -> Gold), time-aware machine learning demand forecasting, unsupervised anomaly detection, and operational monitoring.
+Hailcast is a real-time data engineering, event replay, and predictive analytics platform for urban transportation and mobility intelligence. It demonstrates the complete lifecycle of a mission-critical distributed data system: high-throughput stream ingestion, deterministic deduplication, Medallion data tiering (Bronze -> Silver -> Gold), time-aware machine learning demand forecasting, unsupervised anomaly detection, and operational monitoring.
 
 ## Target User & Surface Mode
 - **Surface Mode**: **Operate** (Production analytics dashboard, mission control, pipeline monitoring, ML workbench).

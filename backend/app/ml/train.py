@@ -106,6 +106,7 @@ def train_and_evaluate(df_hourly: pd.DataFrame) -> Dict[str, Any]:
     }
     
     results = {name: {"mae": [], "rmse": [], "mape": [], "r2": []} for name in models}
+    folds = []
 
     for fold, (train_idx, test_idx) in enumerate(tscv.split(df_feat)):
         train_df = df_feat.iloc[train_idx]
@@ -113,6 +114,12 @@ def train_and_evaluate(df_hourly: pd.DataFrame) -> Dict[str, Any]:
         
         y_train = train_df["trip_count"].values
         y_test = test_df["trip_count"].values
+        folds.append({
+            "fold": fold + 1,
+            "train_start": str(train_df["time_bucket"].min()), "train_end": str(train_df["time_bucket"].max()),
+            "test_start": str(test_df["time_bucket"].min()), "test_end": str(test_df["time_bucket"].max()),
+            "train_hours": len(train_df), "test_hours": len(test_df),
+        })
 
         # 1. Baseline Persistence
         pred_persist = models["Baseline_Persistence"].predict(test_df)
@@ -171,14 +178,19 @@ def train_and_evaluate(df_hourly: pd.DataFrame) -> Dict[str, Any]:
             "features_count": len(feature_cols)
         },
         metrics=lgb_metrics,
-        artifacts={"model_file": str(model_path)},
+        artifacts={"model_file": model_path.name},
         dataset_info={"total_records": len(df_feat), "start_date": str(df_feat["time_bucket"].min()), "end_date": str(df_feat["time_bucket"].max())},
         extra={"all_metrics": metrics_summary, "best_model": best_model}
     )
 
+    for i, f in enumerate(folds):
+        f["mae"] = {name: round(float(m["mae"][i]), 2) for name, m in results.items()}
+
     return {
         "metrics": metrics_summary,
         "best_model": best_model,
+        "folds": folds,
+        "hours_used": len(df_feat),
         "feature_importances": feature_importances,
         "model_path": str(model_path)
     }

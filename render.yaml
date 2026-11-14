@@ -1,0 +1,12 @@
+# Render blueprint: one free web service running the API and the dashboard.
+# No database or Redis is provisioned; the app uses SQLite and its in-memory queue
+# and reseeds the sample data on every start, so nothing needs to persist.
+services:
+  - type: web
+    name: hailcast
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/info
+    autoDeploy: true

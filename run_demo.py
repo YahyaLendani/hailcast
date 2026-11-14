@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlowSight — Quickstart Demo Launcher
+Hailcast: quickstart demo launcher
 Runs the database migrations, loads sample data, trains ML models, and starts the platform server.
 """
 
@@ -16,7 +16,7 @@ BACKEND_DIR = BASE_DIR / "backend"
 
 def main():
     print("=" * 70)
-    print("📊 FlowSight: Real-Time Data Engineering & Analytics Platform")
+    print("Hailcast: real-time data engineering and predictive analytics")
     print("=" * 70)
 
     # Set PYTHONPATH
@@ -28,14 +28,14 @@ def main():
     data_gen = BACKEND_DIR / "app" / "data" / "download_sample.py"
     sample_file = BACKEND_DIR / "app" / "data" / "sample_trips.json"
     if not sample_file.exists():
-        print("  Generating realistic NYC TLC trip sample...")
+        print("  Generating the synthetic trip sample (shaped like NYC TLC records)...")
         subprocess.run([python_bin, str(data_gen)], check=True)
     else:
         print("  Sample trips dataset ready.")
 
     print("\n[Step 2/4] Running End-to-End Pipeline & Data Quality Tests...")
-    test_script = BACKEND_DIR / "tests" / "test_pipeline_e2e.py"
-    res = subprocess.run([python_bin, str(test_script)], check=False)
+    # The tests use a throwaway database, so they never touch the demo data.
+    res = subprocess.run([python_bin, "-m", "pytest", "-q", "-p", "no:warnings"], cwd=str(BASE_DIR), check=False)
     if res.returncode != 0:
         print("  Warning: Tests reported an issue, continuing demo launch...")
 

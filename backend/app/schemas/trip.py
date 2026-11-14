@@ -55,4 +55,5 @@ class ReplayStatusResponse(BaseModel):
     events_replayed: int
     current_simulated_time: Optional[str] = None
     queue_depth: int
+    total_buffered: int = 0
 

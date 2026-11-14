@@ -1,11 +1,12 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from app.core.database import get_db
 from app.core.redis_client import redis_client
 from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand, PipelineRun, DataQualityLog
 from app.services.streaming_worker import streaming_worker
+from app.services.scheduler import scheduler
 
 router = APIRouter(prefix="/health", tags=["Health & Monitoring"])
 
@@ -72,9 +73,21 @@ async def get_pipeline_health(db: AsyncSession = Depends(get_db)):
             "stream_length": stream_stats.get("stream_length", 0),
             "current_eps": streaming_worker.last_eps,
             "total_streamed_events": streaming_worker.processed_count,
-            "deduplicated_in_stream": streaming_worker.deduplicated_count
+            "deduplicated_in_stream": streaming_worker.deduplicated_count,
+            "retried_batches": streaming_worker.retried_count,
+            "failed_events": streaming_worker.failed_count,
+            "dead_letters": list(streaming_worker.dead_letters)[-5:]
         },
+        "scheduled_jobs": scheduler.status(),
         "recent_pipeline_runs": recent_runs,
         "data_quality_tests": dq_tests
     }
+
+
+@router.post("/jobs/{name}/run")
+async def run_scheduled_job(name: str):
+    """Run one scheduled job immediately instead of waiting for its interval."""
+    if name not in scheduler.jobs:
+        raise HTTPException(status_code=404, detail=f"Unknown job: {name}")
+    return await scheduler.run_job(name)
 

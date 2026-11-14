@@ -254,6 +254,15 @@
     .theme-pick { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
     .theme-pick select { font: inherit; color: var(--ink); background: var(--surface); border: 1.5px solid var(--ink); border-radius: 4px; padding: 7px 12px; }
 
+    /* ---------- Filters ---------- */
+    .filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; margin: 0 0 18px; }
+    .filters label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-3); }
+    .filters select, .filters input {
+      font: inherit; font-size: 14px; color: var(--ink); background: var(--surface);
+      border: 1.5px solid var(--ink); border-radius: 4px; padding: 7px 12px; min-height: 36px; color-scheme: light;
+    }
+    [data-theme="night"] .filters select, [data-theme="night"] .filters input { color-scheme: dark; }
+
     /* ---------- Dispatcher view ---------- */
     .lead { font-size: 22px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; max-width: 44ch; margin-bottom: 8px; text-wrap: balance; }
     th.rank, td.rank { width: 36px; color: var(--ink-3); }
@@ -409,9 +418,21 @@
       <div class="split">
         <div>
           <div class="section-head">
-            <h2>Trips per hour, all zones</h2>
+            <h2 id="demand-title">Trips per hour, all zones</h2>
             <p class="hint" id="demand-range">Most recent 72 hours of replayed time.</p>
           </div>
+          <form class="filters" data-filters aria-label="Filter by zone and date">
+            <label>Zone
+              <select data-filter="zone"><option value="">All zones</option></select>
+            </label>
+            <label>From
+              <input type="date" data-filter="from">
+            </label>
+            <label>To
+              <input type="date" data-filter="to">
+            </label>
+            <button class="btn" type="reset">Clear filters</button>
+          </form>
           <div class="legend">
             <span><i style="background:var(--blue)"></i>Trips</span>
             <span><i style="background:var(--alert)"></i>Hour with a flagged zone</span>
@@ -432,6 +453,7 @@
         <div>
           <div class="section-head">
             <h2>Arriving now</h2>
+            <p class="hint">Replayed historical trips, not live traffic.</p>
           </div>
           <ul class="feed" id="feed"><li class="empty" style="display:block;border:0">Start the replay to watch trips arrive.</li></ul>
         </div>
@@ -521,6 +543,18 @@
           <p id="backend-line" class="verdict">Loading…</p>
         </div>
         <div>
+          <div class="section-head">
+            <h2>Failure handling and scheduled jobs</h2>
+          </div>
+          <p id="retry-line" class="verdict">Loading…</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Job</th><th>Runs every</th><th>Last result</th><th class="r">Runs</th><th class="r">Failures</th><th class="r">Took</th><th aria-label="Action"></th></tr></thead>
+              <tbody id="jobs-body"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
           <div class="section-head"><h2>Validation checks</h2></div>
           <div class="table-wrap">
             <table>
@@ -545,8 +579,23 @@
     <section class="panel" role="tabpanel" id="panel-trips" aria-labelledby="tab-trips" hidden>
       <div class="section-head">
         <h2>Latest cleaned trips</h2>
-        <p class="hint">The 40 most recent rows in the Silver table.</p>
+        <p class="hint" id="trips-hint">The 40 most recent rows in the Silver table.</p>
       </div>
+      <form class="filters" data-filters aria-label="Filter by zone and date">
+            <label>Zone
+              <select data-filter="zone"><option value="">All zones</option></select>
+            </label>
+            <label>Paid by
+              <select data-filter="pay"><option value="">Any</option></select>
+            </label>
+            <label>From
+              <input type="date" data-filter="from">
+            </label>
+            <label>To
+              <input type="date" data-filter="to">
+            </label>
+            <button class="btn" type="reset">Clear filters</button>
+          </form>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Pickup</th><th>From</th><th>To</th><th class="r">Miles</th><th class="r">Minutes</th><th class="r">mph</th><th class="r">Total</th><th>Paid by</th><th>Event ID</th></tr></thead>
@@ -733,6 +782,20 @@
         ? `Redis Streams is connected. ${nf.format(st.stream_length)} events are on the stream.`
         : 'Redis is not reachable, so events run through the built-in in-memory queue. Everything works; nothing survives a restart of the stream.';
 
+      const failed = st.failed_events || 0, retried = st.retried_batches || 0;
+      $('retry-line').textContent = (failed
+        ? `${nf.format(failed)} event${failed === 1 ? '' : 's'} could not be stored and ${failed === 1 ? 'was' : 'were'} set aside in the dead-letter list. Latest reason: ${(st.dead_letters || []).slice(-1)[0]?.error || 'unknown'}.`
+        : 'No stream event has failed since the server started.')
+        + ` A failing batch is retried up to 3 times with a growing delay, then split so one bad event cannot block the rest. Retries so far: ${nf.format(retried)}.`;
+      const jobs = health.scheduled_jobs || [];
+      $('jobs-body').innerHTML = jobs.length ? jobs.map(j => `
+        <tr><td>${esc(j.description)}</td><td class="num">${Math.round(j.interval_seconds / 60)} min</td>
+        <td>${j.runs ? resultTag(j.last_status) : 'Not run yet'}</td><td class="r num">${nf.format(j.runs)}</td>
+        <td class="r num">${nf.format(j.failures)}</td>
+        <td class="r num">${j.last_duration_seconds != null ? j.last_duration_seconds.toFixed(2) + ' s' : '—'}</td>
+        <td><button class="btn" type="button" data-job="${esc(j.name)}">Run now</button></td></tr>`).join('')
+        : `<tr><td colspan="7" class="empty">No scheduled jobs are registered.</td></tr>`;
+
       const dq = health.data_quality_tests || [];
       $('dq-body').innerHTML = dq.length ? dq.map(q => `
         <tr><td class="mono">${esc(q.test_name)}</td><td>${esc((q.category || '').replace(/_/g, ' '))}</td>
@@ -753,11 +816,61 @@
       return `<span class="tag ${cls}">${esc(s.charAt(0).toUpperCase() + s.slice(1))}</span>`;
     }
 
+    $('jobs-body').addEventListener('click', e => {
+      const btn = e.target.closest('[data-job]');
+      if (!btn) return;
+      btn.disabled = true;
+      btn.textContent = 'Running…';
+      guard(api(`/health/jobs/${encodeURIComponent(btn.dataset.job)}/run`, { method: 'POST' }).then(loadSummary, err => loadSummary().then(() => { throw err; })));
+    });
+
+    /* Filters shared by the Demand and Trips views */
+    const filters = { zone: '', from: '', to: '', pay: '' };
+    const filtered = () => Boolean(filters.zone || filters.from || filters.to);
+    function filterQuery(base) {
+      const q = new URLSearchParams(base);
+      if (filters.zone) q.set('location_id', filters.zone);
+      if (filters.from) q.set('start', `${filters.from}T00:00:00`);
+      if (filters.to) q.set('end', `${filters.to}T23:59:59`);
+      return q;
+    }
+    function syncFilters() {
+      document.querySelectorAll('[data-filter]').forEach(el => { el.value = filters[el.dataset.filter]; });
+    }
+    async function loadFilterOptions() {
+      const f = await api('/analytics/filters');
+      const fill = (sel, first, items) => { sel.innerHTML = `<option value="">${first}</option>` + items.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(''); };
+      document.querySelectorAll('[data-filter="zone"]').forEach(sel => fill(sel, 'All zones', f.zones.map(z => [z.location_id, z.zone_name])));
+      document.querySelectorAll('[data-filter="pay"]').forEach(sel => fill(sel, 'Any', f.payment_types.map(t => [t, t])));
+      const min = (f.first_pickup || '').slice(0, 10), max = (f.last_pickup || '').slice(0, 10);
+      document.querySelectorAll('[data-filter="from"], [data-filter="to"]').forEach(el => { el.min = min; el.max = max; });
+      syncFilters();
+    }
+    function applyFilters() {
+      syncFilters();
+      guard(Promise.all([loadSeries(), loadTrips()]));
+    }
+    document.querySelectorAll('[data-filter]').forEach(el => el.addEventListener('change', () => {
+      filters[el.dataset.filter] = el.value;
+      applyFilters();
+    }));
+    document.querySelectorAll('[data-filters]').forEach(form => {
+      form.addEventListener('submit', e => e.preventDefault());
+      form.addEventListener('reset', e => {
+        e.preventDefault();
+        Object.keys(filters).forEach(k => { filters[k] = ''; });
+        applyFilters();
+      });
+    });
+
     async function loadSeries() {
-      const rows = await api('/analytics/demand-series?hours=72');
+      const dated = filters.from || filters.to;
+      const rows = await api('/analytics/demand-series?' + filterQuery(dated ? {} : { hours: 72 }));
+      $('demand-title').textContent = `Trips per hour, ${filters.zone ? zoneName(filters.zone) : 'all zones'}`;
+      $('demand-empty').textContent = filtered() ? 'No trips match these filters. Clear them to see everything.' : 'No hourly demand yet. Start the replay to fill the Gold table.';
       $('demand-empty').hidden = rows.length > 0;
       $('chart-demand').parentElement.hidden = rows.length === 0;
-      if (!rows.length) return;
+      if (!rows.length) { $('demand-range').textContent = ''; return; }
       $('demand-range').textContent = `${when(rows[0].time_bucket)} to ${when(rows[rows.length - 1].time_bucket)}, replayed time.`;
       demandChart(rows);
     }
@@ -775,13 +888,17 @@
     }
 
     async function loadTrips() {
-      const trips = await api('/analytics/trips?limit=40');
+      const q = filterQuery({ limit: 40 });
+      if (filters.pay) q.set('payment_type', filters.pay);
+      const trips = await api('/analytics/trips?' + q);
+      const narrowed = filtered() || filters.pay;
+      $('trips-hint').textContent = narrowed ? `The ${trips.length} most recent cleaned trips that match the filters.` : 'The 40 most recent rows in the Silver table.';
       $('trips-body').innerHTML = trips.length ? trips.map(t => `
         <tr><td class="num">${when(t.pickup_datetime)}</td><td>${esc(zoneName(t.pickup_location_id))}</td><td>${esc(zoneName(t.dropoff_location_id))}</td>
         <td class="r num">${n1.format(t.trip_distance)}</td><td class="r num">${t.trip_duration_minutes != null ? n1.format(t.trip_duration_minutes) : '—'}</td>
         <td class="r num">${t.speed_mph != null ? n1.format(t.speed_mph) : '—'}</td><td class="r num">${usd.format(t.total_amount)}</td>
         <td>${esc(t.payment_type || '—')}</td><td class="mono">${esc((t.event_id || '').slice(0, 12))}</td></tr>`).join('')
-        : `<tr><td colspan="9" class="empty">No cleaned trips yet. Start the replay to ingest some.</td></tr>`;
+        : `<tr><td colspan="9" class="empty">${narrowed ? 'No trips match these filters. Clear them to see everything.' : 'No cleaned trips yet. Start the replay to ingest some.'}</td></tr>`;
     }
 
     async function loadAnomalies() {
@@ -895,7 +1012,7 @@
       state.replay = { ...state.replay, ...s };
       const r = state.replay;
       if (r.total_buffered) state.total = r.total_buffered;
-      else if (!state.total && r.queue_depth) state.total = r.queue_depth + (r.events_replayed || 0);
+      else if (!state.total && r.queue_depth) state.total = r.queue_depth;
       const running = r.is_active && !r.is_paused, paused = r.is_active && r.is_paused;
       $('replay-state').textContent = running ? `Running at ${r.speed_multiplier}×` : paused ? 'Paused' : 'Idle';
       $('replay-state').dataset.state = running ? 'running' : paused ? 'paused' : 'idle';
@@ -948,11 +1065,11 @@
     const TABS = ['dispatch', 'demand', 'forecast', 'anomalies', 'quality', 'trips'];
     const tabLoaders = {
       dispatch: loadOutlook,
-      demand: () => Promise.all([loadSeries(), loadZones()]),
+      demand: () => Promise.all([loadSeries(), loadZones(), loadFilterOptions()]),
       forecast: () => Promise.all([loadModels(), loadForecast()]),
       anomalies: loadAnomalies,
       quality: () => Promise.resolve(),
-      trips: loadTrips
+      trips: () => Promise.all([loadTrips(), loadFilterOptions()])
     };
     function selectTab(name, focus) {
       if (!TABS.includes(name)) name = 'dispatch';
@@ -1055,8 +1172,9 @@
 
     /* ---------- Boot ---------- */
     (async () => {
-      await guard(Promise.all([loadZones(), loadStatus(), loadSummary()]));
+      await guard(Promise.all([loadZones(), loadStatus(), loadSummary(), loadFilterOptions()]));
       selectTab(location.hash.slice(1) || 'dispatch');
+      window.addEventListener('hashchange', () => { const name = location.hash.slice(1); if (name !== state.tab) selectTab(name); });
       connect();
       setInterval(() => { if (!state.replay.is_active || state.replay.is_paused) refresh(false); loadStatus().catch(() => {}); }, 10000);
     })();

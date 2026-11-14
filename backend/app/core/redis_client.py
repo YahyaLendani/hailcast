@@ -89,8 +89,6 @@ class RedisStreamClient:
                         for msg_id, data in messages:
                             parsed = json.loads(data["data"])
                             results.append({"stream_id": msg_id, "payload": parsed})
-                            # Ack message
-                            await self.redis.xack(settings.REDIS_STREAM_KEY, settings.REDIS_CONSUMER_GROUP, msg_id)
                 return results
             except Exception as e:
                 logger.error("Redis XREADGROUP error: %s", e)
@@ -106,6 +104,18 @@ class RedisStreamClient:
             except asyncio.QueueEmpty:
                 break
         return results
+
+    async def ack_events(self, events: List[Dict[str, Any]]) -> None:
+        """Acknowledge events after they were stored or dead-lettered (not on read)."""
+        if not (self.is_connected and self.redis):
+            return
+        ids = [e["stream_id"] for e in events if not str(e.get("stream_id", "")).startswith("mem-")]
+        if not ids:
+            return
+        try:
+            await self.redis.xack(settings.REDIS_STREAM_KEY, settings.REDIS_CONSUMER_GROUP, *ids)
+        except Exception as e:
+            logger.error("Redis XACK error: %s", e)
 
     async def get_stream_stats(self) -> Dict[str, Any]:
         """Return current stream length and status."""
