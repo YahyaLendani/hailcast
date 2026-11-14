@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -16,6 +17,7 @@ from app.services.replay_engine import replay_engine
 from app.services.etl_pipeline import ETLPipeline
 from app.services.scheduler import scheduler
 from app.api.routes import ingestion, streaming, analytics, ml, health
+from app.ml.tracking import experiment_tracker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("hailcast")
@@ -40,6 +42,37 @@ scheduler.add_job(
     rebuild_gold_from_silver,
 )
 
+async def bootstrap():
+    """First-run preparation: seed an empty database, start the replay where the
+    stored data ends, and train once so Forecast and Anomalies are never empty."""
+    try:
+        async with AsyncSessionLocal() as session:
+            count = (await session.execute(select(func.count(RawTrip.id)))).scalar_one() or 0
+        seeded = False
+        if count == 0 and settings.AUTO_SEED_ON_STARTUP:
+            ordered = replay_engine._dataset_buffer[:settings.INITIAL_SEED_SIZE]
+            logger.info("Empty database detected. Seeding %d trips...", len(ordered))
+            for start in range(0, len(ordered), 1000):
+                await ETLPipeline.run_batch_ingestion(ordered[start:start + 1000], source_name="initial_seed")
+            seeded = True
+            logger.info("Initial seed complete.")
+
+        async with AsyncSessionLocal() as session:
+            latest = (await session.execute(select(func.max(RawTrip.pickup_datetime)))).scalar_one()
+        replay_engine.resume_after(latest)
+
+        if seeded or not experiment_tracker.get_experiments():
+            async with AsyncSessionLocal() as session:
+                result = await ml.train_and_score(session)
+            logger.info("Startup training complete. Best model: %s", result.get("best_model"))
+    except asyncio.CancelledError:
+        raise
+    except ValueError as exc:
+        logger.warning("Startup training skipped: %s", exc)
+    except Exception:
+        logger.exception("Startup preparation failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -59,17 +92,14 @@ async def lifespan(app: FastAPI):
             trips = json.load(f)
         replay_engine.load_dataset(trips)
 
-        # Auto-seed initial batch into DB if database is empty
-        async with AsyncSessionLocal() as session:
-            count = (await session.execute(select(func.count(RawTrip.id)))).scalar_one() or 0
-            if count == 0:
-                logger.info("Empty database detected. Seeding initial 1,500 trips...")
-                await ETLPipeline.run_batch_ingestion(trips[:1500], source_name="initial_seed")
-                logger.info("Initial seed complete.")
-
+    # Seed, position the replay and train in the background so the server
+    # answers straight away (this matters on slow free hosting).
+    bootstrap_task = asyncio.create_task(bootstrap())
     scheduler.start()
 
     yield
+
+    bootstrap_task.cancel()
 
     # Shutdown
     logger.info("Shutting down Hailcast...")

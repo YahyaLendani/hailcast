@@ -18,6 +18,26 @@ class ReplayEngine:
         self.current_simulated_time: Optional[datetime] = None
         self._task: Optional[asyncio.Task] = None
         self._dataset_buffer: List[Dict[str, Any]] = []
+        self.start_index = 0
+
+    def resume_after(self, latest_pickup: Optional[datetime]):
+        """Start the replay at the first buffered trip newer than what is already stored.
+
+        Without this the replay would begin with trips the database already holds, and a
+        visitor would watch only duplicates being skipped. Wraps to the start when
+        everything has been loaded.
+        """
+        index = 0
+        if latest_pickup is not None:
+            for index, trip in enumerate(self._dataset_buffer):
+                if datetime.fromisoformat(str(trip["pickup_datetime"]).replace("Z", "")) > latest_pickup:
+                    break
+            else:
+                index = 0
+        self.start_index = index
+        if not self.is_active:
+            self.events_replayed = index
+            self.current_simulated_time = latest_pickup if index else None
 
     def load_dataset(self, trips: List[Dict[str, Any]]):
         """Buffer historical trips sorted by pickup_datetime."""
@@ -62,8 +82,9 @@ class ReplayEngine:
             self.is_active = False
             return
 
-        idx = 0
         total = len(self._dataset_buffer)
+        idx = self.start_index if self.start_index < total else 0
+        self.events_replayed = idx
 
         while self.is_active:
             if self.is_paused:
@@ -71,8 +92,14 @@ class ReplayEngine:
                 continue
 
             if idx >= total:
-                # Loop back to begin continuous stream simulation
-                idx = 0
+                # Every buffered trip has been replayed: stop instead of looping, so the
+                # stream never silently turns into duplicates. The next start begins again
+                # from the first trip (and shows deduplication at work).
+                self.is_active = False
+                self.start_index = 0
+                await broadcaster.broadcast("replay_status", {**self.get_status(), "finished": True})
+                logger.info("Replay finished: all %d buffered trips were replayed.", total)
+                break
 
             batch = self._dataset_buffer[idx : idx + self.batch_size]
             idx += len(batch)

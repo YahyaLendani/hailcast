@@ -1,3 +1,4 @@
+import asyncio
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -20,13 +21,15 @@ from app.services.anomaly_detector import anomaly_detector
 
 router = APIRouter(prefix="/ml", tags=["Machine Learning"])
 
-@router.post("/train")
-async def trigger_training(db: AsyncSession = Depends(get_db)):
-    """Train gradient-boosting model and compare against baselines using time-aware validation."""
+async def train_and_score(db: AsyncSession) -> Dict:
+    """Train and evaluate the forecaster on the Gold table, then score anomalies.
+
+    Raises ValueError when there is too little data.
+    """
     res = await db.execute(select(GoldHourlyDemand).order_by(GoldHourlyDemand.time_bucket.asc()))
     records = res.scalars().all()
     if not records:
-        raise HTTPException(status_code=400, detail="No hourly demand data yet. Seed sample data or start the replay first.")
+        raise ValueError("No hourly demand data yet. Seed sample data or start the replay first.")
 
     # Convert to pandas
     data = [
@@ -44,25 +47,34 @@ async def trigger_training(db: AsyncSession = Depends(get_db)):
     df = pd.DataFrame(data)
     
     # 1. Run ML Training & Evaluation
-    try:
-        train_summary = train_and_evaluate(df)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    # Training is CPU work; keep it off the event loop so the API stays responsive.
+    train_summary = await asyncio.to_thread(train_and_evaluate, df)
 
     # 2. Run Anomaly Detection and update DB
-    anom_results = anomaly_detector.fit_detect(data)
+    anom_results = await asyncio.to_thread(anomaly_detector.fit_detect, data)
+    lookup = {(a["time_bucket"], a["location_id"]): a for a in anom_results}
     for rec in records:
-        match = next((a for a in anom_results if a["time_bucket"] == rec.time_bucket and a["location_id"] == rec.location_id), None)
+        match = lookup.get((rec.time_bucket, rec.location_id))
         if match:
             rec.is_anomaly = match["is_anomaly"]
             rec.anomaly_score = match["anomaly_score"]
     await db.commit()
+    return train_summary
 
+
+@router.post("/train")
+async def trigger_training(db: AsyncSession = Depends(get_db)):
+    """Train gradient-boosting model and compare against baselines using time-aware validation."""
+    try:
+        train_summary = await train_and_score(db)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return {
         "status": "success",
         "message": "Models trained successfully with time-aware walk-forward validation.",
         "results": train_summary
     }
+
 
 def _latest_metrics() -> tuple[List[ModelMetrics], Optional[str]]:
     """Walk-forward metrics from the most recent training run (empty if never trained)."""

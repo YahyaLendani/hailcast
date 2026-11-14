@@ -46,7 +46,7 @@ class BatchIngestResponse(BaseModel):
 class ReplayControlRequest(BaseModel):
     action: str = Field(..., description="'start', 'pause', 'resume', or 'stop'")
     speed_multiplier: float = Field(default=10.0, ge=1.0, le=100.0)
-    batch_size: int = Field(default=50, ge=1, le=500)
+    batch_size: int = Field(default=10, ge=1, le=500)
 
 class ReplayStatusResponse(BaseModel):
     is_active: bool

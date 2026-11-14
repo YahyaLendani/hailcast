@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     REPLAY_SPEED_MULTIPLIER: float = 10.0
     BATCH_SIZE: int = 1000
     AUTO_SEED_ON_STARTUP: bool = True
-    INITIAL_SEED_SIZE: int = 4500
+    INITIAL_SEED_SIZE: int = 5000
 
     # When set, upload endpoints require this value in the X-API-Key header
     API_KEY: str = ""

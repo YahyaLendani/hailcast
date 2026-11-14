@@ -1014,7 +1014,7 @@
       if (r.total_buffered) state.total = r.total_buffered;
       else if (!state.total && r.queue_depth) state.total = r.queue_depth;
       const running = r.is_active && !r.is_paused, paused = r.is_active && r.is_paused;
-      $('replay-state').textContent = running ? `Running at ${r.speed_multiplier}×` : paused ? 'Paused' : 'Idle';
+      $('replay-state').textContent = running ? `Running at ${r.speed_multiplier}×` : paused ? 'Paused' : (state.total && (r.events_replayed || 0) >= state.total ? 'Replay finished' : 'Idle');
       $('replay-state').dataset.state = running ? 'running' : paused ? 'paused' : 'idle';
       $('btn-start-label').textContent = paused ? 'Resume' : 'Start replay';
       $('btn-start').disabled = running;

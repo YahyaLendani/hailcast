@@ -2,6 +2,8 @@
 
 **Real-time data engineering and predictive analytics for taxi demand.**
 
+**Live demo: <https://hailcast.onrender.com>** (free hosting: if it has been idle, the first load can take up to a minute)
+
 Hailcast ingests trip records in batch and as a replayed event stream, cleans them through
 Bronze, Silver and Gold tables, forecasts hourly demand, flags unusual hours, and shows all of it
 on a live dashboard. It is a portfolio project that demonstrates data engineering, backend,
@@ -150,8 +152,8 @@ Honest state of each item. "Partial" means some of it exists but it is not what 
 | Infra | Retry and failure handling | Done and tested. |
 | Infra | Scheduled jobs | Done (in-process scheduler). |
 | Infra | Monitoring dashboards and logs | Done at demo level: health endpoint, Pipeline view, logs. No Prometheus or Grafana. |
-| Infra | Docker and CI | Files are in place (`docker-compose.yml`, GitHub Actions running lint and pytest). Not yet verified on GitHub or with a full `docker compose up`. |
-| Infra | Deployment, public demo URL | Not done. |
+| Infra | Docker and CI | Done. GitHub Actions runs lint and pytest, then builds the backend image, starts it and checks it serves. `docker compose up` with PostgreSQL and Redis is not covered by CI. |
+| Infra | Deployment, public demo URL | Done: <https://hailcast.onrender.com> on Render's free plan, deployed from `render.yaml`. |
 
 ## Put it online
 

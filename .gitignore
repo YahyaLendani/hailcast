@@ -22,3 +22,7 @@ Thumbs.db
 
 # Local tool settings (machine-specific paths)
 .claude/
+
+# Trained model and experiment log (recreated by training on startup)
+backend/app/ml/saved_models/*.joblib
+backend/app/ml/saved_models/experiments_registry.json
