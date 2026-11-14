@@ -63,8 +63,14 @@ jobs:
             sleep 2
           done
           curl -fsS http://localhost:8080/api/v1/health/ > /dev/null
-          curl -fsS http://localhost:8080/ | grep -q "Hailcast"
-          curl -fsS "http://localhost:8080/api/v1/analytics/demand-series?hours=24" | grep -q "trip_count"
+          curl -fsS http://localhost:8080/ -o page.html && grep -q "Hailcast" page.html
+          # The sample is seeded in the background after start; wait for it to land
+          for i in $(seq 1 60); do
+            curl -fsS "http://localhost:8080/api/v1/analytics/demand-series?hours=24" -o series.json || true
+            if grep -q "trip_count" series.json; then break; fi
+            sleep 3
+          done
+          grep -q "trip_count" series.json
           # Uploads must be refused without the key and accepted with it
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST 'http://localhost:8080/api/v1/ingest/seed-sample?sample_size=10')" = "401"
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-API-Key: ci-key' 'http://localhost:8080/api/v1/ingest/seed-sample?sample_size=10')" = "200"
