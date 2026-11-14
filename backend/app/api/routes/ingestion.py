@@ -5,10 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.config import settings
 from app.core.redis_client import redis_client
+from app.core.security import require_api_key
 from app.schemas.trip import TripCreate, BatchIngestRequest, BatchIngestResponse
 from app.services.etl_pipeline import ETLPipeline
 
-router = APIRouter(prefix="/ingest", tags=["Ingestion"])
+router = APIRouter(prefix="/ingest", tags=["Ingestion"], dependencies=[Depends(require_api_key)])
 
 @router.post("/batch", response_model=BatchIngestResponse)
 async def ingest_batch(request: BatchIngestRequest):

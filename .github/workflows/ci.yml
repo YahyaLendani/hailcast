@@ -50,5 +50,26 @@ jobs:
 
       - name: Verify Docker Compose Config
         run: |
-          docker compose config
+          docker compose config -q
+
+      - name: Build the backend image
+        run: docker build -t hailcast-backend ./backend
+
+      - name: Start the container and check that it serves
+        run: |
+          docker run -d --name hailcast -e PORT=8080 -e API_KEY=ci-key -p 8080:8080 hailcast-backend
+          for i in $(seq 1 45); do
+            if curl -fsS http://localhost:8080/api/v1/health/ > /dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:8080/api/v1/health/ > /dev/null
+          curl -fsS http://localhost:8080/ | grep -q "Hailcast"
+          curl -fsS "http://localhost:8080/api/v1/analytics/demand-series?hours=24" | grep -q "trip_count"
+          # Uploads must be refused without the key and accepted with it
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST 'http://localhost:8080/api/v1/ingest/seed-sample?sample_size=10')" = "401"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-API-Key: ci-key' 'http://localhost:8080/api/v1/ingest/seed-sample?sample_size=10')" = "200"
+
+      - name: Container logs
+        if: always()
+        run: docker logs hailcast 2>&1 | tail -40
 

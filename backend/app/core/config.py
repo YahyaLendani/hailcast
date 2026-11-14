@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     AUTO_SEED_ON_STARTUP: bool = True
     INITIAL_SEED_SIZE: int = 4500
 
+    # When set, upload endpoints require this value in the X-API-Key header
+    API_KEY: str = ""
+
     # CORS
     CORS_ORIGINS: List[str] = ["*"]
 

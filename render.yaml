@@ -10,3 +10,8 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/info
     autoDeploy: true
+    envVars:
+      # Locks the upload endpoints on the public demo. Render generates the value;
+      # read it in the service's Environment tab if you need to upload data.
+      - key: API_KEY
+        generateValue: true

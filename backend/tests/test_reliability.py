@@ -119,6 +119,27 @@ def test_features_never_use_the_future():
     assert "trip_count" not in cols
 
 
+def test_uploads_need_the_api_key_when_one_is_set(monkeypatch):
+    from httpx import ASGITransport, AsyncClient
+    from app.main import app
+
+    async def scenario():
+        await init_db()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            seed = "/api/v1/ingest/seed-sample?sample_size=5"
+            assert (await client.post(seed)).status_code == 200  # no key configured: open
+
+            monkeypatch.setattr(settings, "API_KEY", "s3cret")
+            assert (await client.post(seed)).status_code == 401
+            assert (await client.post(seed, headers={"X-API-Key": "wrong"})).status_code == 401
+            assert (await client.post(seed, headers={"X-API-Key": "s3cret"})).status_code == 200
+            # Reading and the replay status stay public
+            assert (await client.get("/api/v1/analytics/filters")).status_code == 200
+            assert (await client.get("/api/v1/stream/status")).status_code == 200
+
+    run(scenario())
+
+
 def test_trip_and_demand_filters():
     from httpx import ASGITransport, AsyncClient
     from app.main import app

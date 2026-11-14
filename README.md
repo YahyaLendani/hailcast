@@ -134,7 +134,7 @@ Honest state of each item. "Partial" means some of it exists but it is not what 
 | Frontend | Next.js + TypeScript | **Partial.** `frontend/` holds an earlier Next.js prototype; it is not the served UI and its Docker image does not build. |
 | Backend | Analytics API, batch ingestion | Done (FastAPI). |
 | Backend | WebSocket or SSE updates | Done, both. |
-| Backend | Authentication | Not built; the brief asks for it only "when required" and the demo has no private data. |
+| Backend | Authentication | Done where required: an API key locks the upload endpoints on the hosted demo. No user accounts. |
 | Data | Public dataset imported | **Not done.** The sample is generated, not downloaded from NYC TLC. |
 | Data | Batch ingestion, simulated streaming, replay | Done; replayed data is labelled. |
 | Data | Bronze, Silver, Gold | Done. |
@@ -155,16 +155,28 @@ Honest state of each item. "Partial" means some of it exists but it is not what 
 
 ## Put it online
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/YahyaLendani/hailcast)
+
 The repository includes `render.yaml`, a blueprint for one free [Render](https://render.com) web
 service that runs the API and the dashboard from `backend/Dockerfile`.
 
-1. Push this repository to GitHub.
-2. In Render choose **New, Blueprint**, pick the repository and apply.
-3. Render builds the image and gives the app a public `https://<name>.onrender.com` address.
+1. Press the button above (or in Render choose **New, Blueprint** and pick the repository) and apply.
+2. Render builds the image and gives the app a public `https://<name>.onrender.com` address.
+3. In GitHub, set the repository variable `DEMO_URL` to that address (Settings, Secrets and
+   variables, Actions, Variables). The `Keep demo awake` workflow then pings it every 10 minutes so
+   visitors do not wait for the free plan to wake up.
 
-Things to know: the free plan sleeps after about 15 minutes without visitors, so the first load can
-take up to a minute. Data is reseeded on every start. The demo has no login, so anyone with the link
-can start the replay or upload trips; do not put private data in it.
+Things to know:
+
+- **Uploads are locked on the hosted demo.** The blueprint generates an `API_KEY`; the `/ingest`
+  endpoints then need it in an `X-API-Key` header. Visitors can still run the replay, filter, retrain
+  and run the scheduled job, which only ever touch the built-in sample. Locally, with no `API_KEY`
+  set, everything is open.
+- **Data is reseeded on every start**, so nothing a visitor does persists across restarts.
+- **The image is tested in CI.** Every push builds `backend/Dockerfile`, starts the container and
+  checks the dashboard, the API and the upload lock.
+- GitHub's scheduler is best effort, and pauses after 60 days without repository activity, so an
+  occasional slow first load is still possible.
 
 ## Docker
 
@@ -180,7 +192,7 @@ standalone stream worker and the Next.js prototype are behind profiles (`--profi
 
 ```
 backend/app/api/routes/   REST endpoints: ingest, stream, analytics, ml, health
-backend/app/core/         settings, database, Redis Streams client
+backend/app/core/         settings, database, Redis Streams client, API-key check
 backend/app/data/         sample generator and generated sample
 backend/app/ml/           features, baselines, LightGBM, training, experiment registry
 backend/app/services/     ETL, validation, replay engine, streaming worker, scheduler, anomalies
@@ -191,3 +203,7 @@ dbt_project/              dbt models (not wired yet)
 frontend/                 earlier Next.js prototype (not the served UI)
 docs/                     architecture, EDA report, ML evaluation report
 ```
+
+## License
+
+[MIT](LICENSE)
