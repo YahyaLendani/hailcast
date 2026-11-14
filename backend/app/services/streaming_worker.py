@@ -4,7 +4,7 @@ from collections import deque
 from datetime import datetime
 from typing import Dict, Any, List, Set, Tuple
 from sqlalchemy import select
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, write_lock
 from app.core.redis_client import redis_client
 from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand
 from app.services.data_cleaner import DataCleaner
@@ -23,7 +23,7 @@ class StreamingWorker:
         self.retried_count = 0
         self.dead_letters = deque(maxlen=200)
         # Held while Gold rows are written, so the scheduled rebuild cannot interleave.
-        self.write_lock = asyncio.Lock()
+        self.write_lock = write_lock
         self.is_running = False
         self._task = None
         self.processed_count = 0

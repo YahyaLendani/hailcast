@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from typing import List, Dict, Any, Set
 from sqlalchemy import select, func
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, write_lock
 from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand, PipelineRun, DataQualityLog
 from app.services.data_cleaner import DataCleaner
 
@@ -12,6 +12,12 @@ logger = logging.getLogger(__name__)
 class ETLPipeline:
     @staticmethod
     async def run_batch_ingestion(trips_data: List[Dict[str, Any]], source_name: str = "batch_file") -> Dict[str, Any]:
+        """Batch ingestion, serialised with the other pipeline writers."""
+        async with write_lock:
+            return await ETLPipeline._run_batch_ingestion(trips_data, source_name)
+
+    @staticmethod
+    async def _run_batch_ingestion(trips_data: List[Dict[str, Any]], source_name: str = "batch_file") -> Dict[str, Any]:
         """Full ETL Pipeline: Ingestion (Bronze) -> Validation & Cleaning (Silver) -> SQL Aggregations (Gold)."""
         start_time = time.time()
         ingested = 0

@@ -1,3 +1,4 @@
+import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
@@ -21,6 +22,12 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
     autoflush=False,
 )
+
+
+# One writer at a time for the pipeline tables. The stream worker, batch ingestion and
+# the scheduled Gold rebuild all upsert the same Gold rows; without this they can race
+# into UNIQUE-constraint failures.
+write_lock = asyncio.Lock()
 
 
 async def get_db():
