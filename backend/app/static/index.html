@@ -932,8 +932,8 @@
       if (lgb && rivals.length) {
         const r = rivals[0];
         $('verdict').textContent = res.best_model === 'LightGBM_Forecaster'
-          ? `LightGBM is off by ${lgb.mae.toFixed(1)} trips per hour on average, ahead of the best baseline (${modelLabel(r.model_name)}, ${r.mae.toFixed(1)}).`
-          : `On this data, ${modelLabel(r.model_name)} (off by ${r.mae.toFixed(1)} trips per hour) beats LightGBM (${lgb.mae.toFixed(1)}).`;
+          ? `On this data, LightGBM has a lower average error (${lgb.mae.toFixed(1)} trips per hour) than the best baseline, ${modelLabel(r.model_name)} (${r.mae.toFixed(1)}).`
+          : `On this data, ${modelLabel(r.model_name)} has a lower average error (${r.mae.toFixed(1)} trips per hour) than LightGBM (${lgb.mae.toFixed(1)}).`;
       } else if (lgb) {
         $('verdict').textContent = `LightGBM is off by ${lgb.mae.toFixed(1)} trips per hour on average. Retrain to compare it against the baselines.`;
       }
