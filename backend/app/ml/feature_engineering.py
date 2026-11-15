@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 from typing import Tuple, List
 
+# Hours of history every row needs: the longest lag and rolling window.
+HISTORY_HOURS = 24
+
 class FeatureEngineer:
     @staticmethod
     def create_features(df: pd.DataFrame, target_col: str = "trip_count") -> Tuple[pd.DataFrame, List[str]]:
@@ -28,23 +31,23 @@ class FeatureEngineer:
         df["is_rush_hour"] = hour.isin([7, 8, 9, 16, 17, 18, 19]).astype(int)
         df["is_night"] = hour.isin([0, 1, 2, 3, 4, 5]).astype(int)
 
-        # 2. Causal Lag Features (strictly strictly past data - NO future leakage)
+        # 2. Causal Lag Features (past hours only)
         df["lag_1h"] = df[target_col].shift(1)
         df["lag_2h"] = df[target_col].shift(2)
         df["lag_3h"] = df[target_col].shift(3)
         df["lag_24h"] = df[target_col].shift(24)
 
-        # 3. Rolling Window Aggregations (using closed='left' to prevent current/future leakage)
-        df["rolling_mean_3h"] = df[target_col].shift(1).rolling(window=3, min_periods=1).mean()
-        df["rolling_mean_6h"] = df[target_col].shift(1).rolling(window=6, min_periods=1).mean()
-        df["rolling_mean_24h"] = df[target_col].shift(1).rolling(window=24, min_periods=1).mean()
-        df["rolling_std_6h"] = df[target_col].shift(1).rolling(window=6, min_periods=1).std().fillna(0)
+        # 3. Rolling windows over the hours before this one (shifted by one hour, full windows only)
+        past = df[target_col].shift(1)
+        df["rolling_mean_3h"] = past.rolling(window=3).mean()
+        df["rolling_mean_6h"] = past.rolling(window=6).mean()
+        df["rolling_mean_24h"] = past.rolling(window=24).mean()
+        df["rolling_std_6h"] = past.rolling(window=6).std()
 
         # 4. Contextual interaction features
         df["avg_fare_lag1"] = df["avg_fare"].shift(1) if "avg_fare" in df else 0.0
         df["avg_distance_lag1"] = df["avg_distance"].shift(1) if "avg_distance" in df else 0.0
 
-        # Drop NaNs created by shifting
         feature_cols = [
             "hour_sin", "hour_cos", "dow_sin", "dow_cos",
             "is_weekend", "is_rush_hour", "is_night",
@@ -52,8 +55,9 @@ class FeatureEngineer:
             "rolling_mean_3h", "rolling_mean_6h", "rolling_mean_24h", "rolling_std_6h"
         ]
 
-        # Fill initial NaNs with backward fill or mean for valid model execution
-        df[feature_cols] = df[feature_cols].bfill().fillna(0.0)
+        # The first HISTORY_HOURS rows have no complete 24-hour history. They are dropped, never
+        # back-filled: back-filling copies later values (including a row's own target) into them.
+        df = df.dropna(subset=feature_cols).reset_index(drop=True)
 
         return df, feature_cols
 

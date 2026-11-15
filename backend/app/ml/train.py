@@ -5,9 +5,10 @@ from typing import Dict, Any, Tuple
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error, r2_score
 from app.core.config import settings
-from app.ml.feature_engineering import FeatureEngineer
+from app.ml.feature_engineering import FeatureEngineer, HISTORY_HOURS
 from app.ml.models import (
     BaselinePersistenceModel,
+    BaselineSeasonalNaiveModel,
     BaselineHourlyAverageModel,
     LightGBMDemandForecaster
 )
@@ -21,7 +22,8 @@ def compute_mape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
         return 0.0
     return float(np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100)
 
-MIN_TRAIN_HOURS = 12
+# Complete hours needed: HISTORY_HOURS are used up by the lag features, 12 remain to model.
+MIN_TRAIN_HOURS = HISTORY_HOURS + 12
 
 
 def to_citywide_hourly(df: pd.DataFrame, drop_incomplete: bool = True) -> pd.DataFrame:
@@ -101,17 +103,20 @@ def train_and_evaluate(df_hourly: pd.DataFrame) -> Dict[str, Any]:
     
     models = {
         "Baseline_Persistence": BaselinePersistenceModel(),
+        "Baseline_Seasonal_Naive": BaselineSeasonalNaiveModel(),
         "Baseline_Hourly_Avg": BaselineHourlyAverageModel(),
         "LightGBM_Forecaster": LightGBMDemandForecaster()
     }
-    
+
     results = {name: {"mae": [], "rmse": [], "mape": [], "r2": []} for name in models}
     folds = []
+    # Every test hour with each model's prediction, pooled over the folds for paired comparisons.
+    test_predictions = {"time_bucket": [], "actual": [], **{name: [] for name in models}}
 
     for fold, (train_idx, test_idx) in enumerate(tscv.split(df_feat)):
         train_df = df_feat.iloc[train_idx]
         test_df = df_feat.iloc[test_idx]
-        
+
         y_train = train_df["trip_count"].values
         y_test = test_df["trip_count"].values
         folds.append({
@@ -121,28 +126,18 @@ def train_and_evaluate(df_hourly: pd.DataFrame) -> Dict[str, Any]:
             "train_hours": len(train_df), "test_hours": len(test_df),
         })
 
-        # 1. Baseline Persistence
-        pred_persist = models["Baseline_Persistence"].predict(test_df)
-        results["Baseline_Persistence"]["mae"].append(mean_absolute_error(y_test, pred_persist))
-        results["Baseline_Persistence"]["rmse"].append(root_mean_squared_error(y_test, pred_persist))
-        results["Baseline_Persistence"]["mape"].append(compute_mape(y_test, pred_persist))
-        results["Baseline_Persistence"]["r2"].append(r2_score(y_test, pred_persist))
-
-        # 2. Baseline Hourly Average
         models["Baseline_Hourly_Avg"].fit(train_df, target_col="trip_count")
-        pred_avg = models["Baseline_Hourly_Avg"].predict(test_df)
-        results["Baseline_Hourly_Avg"]["mae"].append(mean_absolute_error(y_test, pred_avg))
-        results["Baseline_Hourly_Avg"]["rmse"].append(root_mean_squared_error(y_test, pred_avg))
-        results["Baseline_Hourly_Avg"]["mape"].append(compute_mape(y_test, pred_avg))
-        results["Baseline_Hourly_Avg"]["r2"].append(r2_score(y_test, pred_avg))
-
-        # 3. LightGBM Forecaster
         models["LightGBM_Forecaster"].fit(train_df, y_train, feature_cols)
-        pred_lgb = models["LightGBM_Forecaster"].predict(test_df)
-        results["LightGBM_Forecaster"]["mae"].append(mean_absolute_error(y_test, pred_lgb))
-        results["LightGBM_Forecaster"]["rmse"].append(root_mean_squared_error(y_test, pred_lgb))
-        results["LightGBM_Forecaster"]["mape"].append(compute_mape(y_test, pred_lgb))
-        results["LightGBM_Forecaster"]["r2"].append(r2_score(y_test, pred_lgb))
+
+        test_predictions["time_bucket"] += [str(t) for t in test_df["time_bucket"]]
+        test_predictions["actual"] += [float(v) for v in y_test]
+        for name, model in models.items():
+            pred = model.predict(test_df)
+            test_predictions[name] += [float(v) for v in pred]
+            results[name]["mae"].append(mean_absolute_error(y_test, pred))
+            results[name]["rmse"].append(root_mean_squared_error(y_test, pred))
+            results[name]["mape"].append(compute_mape(y_test, pred))
+            results[name]["r2"].append(r2_score(y_test, pred))
 
     # Summary of metrics across folds
     metrics_summary = []
@@ -191,6 +186,8 @@ def train_and_evaluate(df_hourly: pd.DataFrame) -> Dict[str, Any]:
         "best_model": best_model,
         "folds": folds,
         "hours_used": len(df_feat),
+        "hours_dropped_for_history": len(df_hourly) - len(df_feat),
+        "test_predictions": test_predictions,
         "feature_importances": feature_importances,
         "model_path": str(model_path)
     }

@@ -22,7 +22,8 @@ async def run_e2e_tests():
     print("=== 2. Batch Ingestion & Validation ===")
     sample_file = settings.DATA_DIR / "sample_trips.json"
     with open(sample_file, "r", encoding="utf-8") as f:
-        trips = json.load(f)[:1200]
+        # About 54 hours: the forecaster needs 24 hours of history plus hours to train and test on.
+        trips = json.load(f)[:3000]
 
     ingest_res = await ETLPipeline.run_batch_ingestion(trips, source_name="e2e_test")
     print(f"Ingested: {ingest_res['ingested']}, Deduplicated: {ingest_res['deduplicated']}, Failed: {ingest_res['failed']}")

@@ -633,7 +633,7 @@
 
     const state = { zones: {}, replay: { is_active: false, is_paused: false, events_replayed: 0 }, total: 0, tab: 'demand', charts: {}, loaded: {} };
     const zoneName = id => state.zones[id] || `Zone ${id}`;
-    const MODEL_LABELS = { LightGBM_Forecaster: 'LightGBM', Baseline_Persistence: 'Persistence (last hour)', Baseline_Hourly_Avg: 'Hour-of-week average' };
+    const MODEL_LABELS = { LightGBM_Forecaster: 'LightGBM', Baseline_Persistence: 'Persistence (last hour)', Baseline_Seasonal_Naive: 'Same hour yesterday', Baseline_Hourly_Avg: 'Hour-of-day average' };
     const modelLabel = n => MODEL_LABELS[n] || n;
 
     async function api(path, opts) {
@@ -933,7 +933,7 @@
         const r = rivals[0];
         $('verdict').textContent = res.best_model === 'LightGBM_Forecaster'
           ? `LightGBM is off by ${lgb.mae.toFixed(1)} trips per hour on average, ahead of the best baseline (${modelLabel(r.model_name)}, ${r.mae.toFixed(1)}).`
-          : `With this little history, ${modelLabel(r.model_name)} (off by ${r.mae.toFixed(1)} trips per hour) still beats LightGBM (${lgb.mae.toFixed(1)}). Replay a few more days, then retrain.`;
+          : `On this data, ${modelLabel(r.model_name)} (off by ${r.mae.toFixed(1)} trips per hour) beats LightGBM (${lgb.mae.toFixed(1)}).`;
       } else if (lgb) {
         $('verdict').textContent = `LightGBM is off by ${lgb.mae.toFixed(1)} trips per hour on average. Retrain to compare it against the baselines.`;
       }

@@ -2,42 +2,46 @@ import numpy as np
 import pandas as pd
 import joblib
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Optional
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error, r2_score
 from lightgbm import LGBMRegressor
 
 class BaselinePersistenceModel:
-    """Baseline Model 1: Naive Persistence (predicts demand = lag_1h)."""
+    """Baseline: previous hour (predicts demand = lag_1h)."""
     def __init__(self):
         self.name = "Baseline Persistence (Naive Lag-1)"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         return df["lag_1h"].values
 
-class BaselineHourlyAverageModel:
-    """Baseline Model 2: Historical Day-Hour Average Demand."""
+class BaselineSeasonalNaiveModel:
+    """Baseline: same hour yesterday (predicts demand = lag_24h)."""
     def __init__(self):
-        self.name = "Baseline Hourly Average (Day/Hour Profile)"
-        self.lookup_table: Dict[Tuple[int, int], float] = {}
+        self.name = "Baseline Seasonal Naive (same hour yesterday)"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        return df["lag_24h"].values
+
+class BaselineHourlyAverageModel:
+    """Baseline: mean demand for each hour of the day (0 to 23) in the training window.
+
+    Day of week is ignored on purpose. With about a week of data a (day of week, hour)
+    key from a test window never appears in its training window, so such a model would
+    always fall back to the overall mean.
+    """
+    def __init__(self):
+        self.name = "Baseline Hour-of-Day Average"
+        self.lookup_table: Dict[int, float] = {}
         self.global_mean: float = 0.0
 
     def fit(self, df: pd.DataFrame, target_col: str = "trip_count"):
         self.global_mean = float(df[target_col].mean())
-        df_copy = df.copy()
-        df_copy["hour"] = df_copy["time_bucket"].dt.hour
-        df_copy["dow"] = df_copy["time_bucket"].dt.dayofweek
-        grouped = df_copy.groupby(["dow", "hour"])[target_col].mean()
-        self.lookup_table = grouped.to_dict()
+        hours = pd.to_datetime(df["time_bucket"]).dt.hour
+        self.lookup_table = df[target_col].groupby(hours).mean().to_dict()
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
-        df_copy = df.copy()
-        df_copy["hour"] = df_copy["time_bucket"].dt.hour
-        df_copy["dow"] = df_copy["time_bucket"].dt.dayofweek
-        preds = []
-        for _, row in df_copy.iterrows():
-            key = (int(row["dow"]), int(row["hour"]))
-            preds.append(self.lookup_table.get(key, self.global_mean))
-        return np.array(preds)
+        hours = pd.to_datetime(df["time_bucket"]).dt.hour
+        return np.array([self.lookup_table.get(int(h), self.global_mean) for h in hours])
 
 class LightGBMDemandForecaster:
     """Gradient-Boosted Decision Trees demand forecaster using LightGBM."""

@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from conftest import run  # also isolates the database; must come before app imports
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, init_db
-from app.ml.feature_engineering import FeatureEngineer
+from app.ml.feature_engineering import FeatureEngineer, HISTORY_HOURS
 from app.models.events import RawTrip
 from app.services import streaming_worker as worker_module
 from app.services.etl_pipeline import ETLPipeline
@@ -102,21 +102,27 @@ def test_scheduler_records_success_and_failure():
 
 
 def test_features_never_use_the_future():
-    """Changing demand from hour t onward must not change any feature before hour t."""
+    """Changing demand from hour t onward must not change any feature of hour t or earlier.
+
+    Every t is tried, the first hour included: back-filling the first rows would copy a row's own
+    demand into its lag features, and only a change at the very start shows that.
+    """
     rng = np.random.default_rng(7)
     hours = pd.date_range("2026-10-01", periods=96, freq="h")
-    base = pd.DataFrame({"time_bucket": hours, "trip_count": rng.integers(20, 200, size=96)})
-    changed = base.copy()
-    cut = 60
-    changed.loc[cut:, "trip_count"] = changed.loc[cut:, "trip_count"] * 10 + 999
-
+    base = pd.DataFrame({"time_bucket": hours, "trip_count": rng.integers(20, 200, size=96).astype(float)})
     feat_a, cols = FeatureEngineer.create_features(base)
-    feat_b, _ = FeatureEngineer.create_features(changed)
-    before_a = feat_a[feat_a["time_bucket"] <= hours[cut]].set_index("time_bucket")[cols]
-    before_b = feat_b[feat_b["time_bucket"] <= hours[cut]].set_index("time_bucket")[cols]
-    assert len(before_a) > 0
-    pd.testing.assert_frame_equal(before_a, before_b)
     assert "trip_count" not in cols
+    assert feat_a["time_bucket"].iloc[0] == hours[HISTORY_HOURS]  # rows without full history dropped
+    assert not feat_a[cols].isna().any().any()
+
+    for cut in range(len(hours)):
+        changed = base.copy()
+        changed.loc[cut:, "trip_count"] = changed.loc[cut:, "trip_count"] * 10 + 999
+        feat_b, _ = FeatureEngineer.create_features(changed)
+        before_a = feat_a[feat_a["time_bucket"] <= hours[cut]].set_index("time_bucket")[cols]
+        before_b = feat_b[feat_b["time_bucket"] <= hours[cut]].set_index("time_bucket")[cols]
+        assert len(before_a) == max(0, cut - HISTORY_HOURS + 1)
+        pd.testing.assert_frame_equal(before_a, before_b, obj=f"features up to hour {cut}")
 
 
 def test_uploads_need_the_api_key_when_one_is_set(monkeypatch):

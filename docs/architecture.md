@@ -26,7 +26,7 @@ flowchart TD
     subgraph ML ["4. Machine Learning & Forecasting"]
         G3 -->|Walk-Forward TimeSeriesSplit| H1[Feature Engineering]
         H1 -->|Cyclical & Causal Lags| H2[LightGBM Demand Forecaster]
-        H1 -->|Day/Hour Average| H3[Baseline Profile Model]
+        H1 -->|Previous Hour, Same Hour Yesterday, Hour-of-Day Average| H3[Baseline Models]
         H1 -->|Multi-Dimensional Outliers| H4[Isolation Forest Anomaly Detector]
         H2 -->|Model Weights & Metrics| I1[Experiment Tracker & Model Registry]
     end
