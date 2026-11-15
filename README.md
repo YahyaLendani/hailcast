@@ -71,17 +71,31 @@ runs the walk-forward evaluation and rewrites both reports from what it measured
 - [docs/eda_report.md](docs/eda_report.md): exploratory data analysis.
 - [docs/ml_evaluation_report.md](docs/ml_evaluation_report.md): model comparison, per-fold results, leakage checks, limits.
 
-Result of the latest generated run (one hour ahead, city-wide, mean of three walk-forward folds):
+**Result: LightGBM is not shown to beat a simple baseline.** The test and its decision rule were
+written down and committed before the run:
+[docs/forecast_evaluation_preregistration.md](docs/forecast_evaluation_preregistration.md).
+
+One hour ahead, city-wide, over 105 test hours in three walk-forward folds of 35 hours:
 
 | Model | MAE (trips/hour) | RMSE | MAPE | R² |
 | :--- | ---: | ---: | ---: | ---: |
-| Baseline: same as the previous hour | 20.11 | 37.16 | 37.8% | 0.290 |
-| Baseline: average for that hour of day | 31.97 | 42.92 | 121.8% | -0.007 |
-| **LightGBM** | 13.30 | 27.88 | 24.6% | 0.512 |
+| Baseline: same as the previous hour | 20.61 | 37.18 | 36.9% | 0.335 |
+| **Baseline: same hour yesterday** | **13.26** | 31.69 | 20.3% | 0.036 |
+| Baseline: average for that hour of day | 13.29 | 27.85 | 20.7% | 0.417 |
+| LightGBM | 13.89 | 27.38 | 24.2% | 0.444 |
 
-Seven days of synthetic data means each test window is 41 hours. Read these numbers as proof that
-the method runs end to end, not as a claim about real demand. In one of the three folds the
-previous-hour baseline beats LightGBM, and the report shows it.
+- The strongest baseline, "same hour yesterday", misses by 13.26 trips per hour and LightGBM by 13.89.
+  The 95% interval for LightGBM's error minus the baseline's, per hour, is −5.46 to +2.78 trips
+  (block bootstrap). It includes zero, so neither is shown to be better. LightGBM has the lower MAE
+  in none of the three folds.
+- LightGBM has the lowest RMSE and the highest R², because "same hour yesterday" makes a few large
+  misses. Its biggest is repeating the one-off spike at 18:00 on 5 November into the next day (off by
+  242 trips), and it also misses on Saturday morning by copying Friday's rush.
+- The synthetic data is a fixed daily curve plus noise, which suits "same hour yesterday" by
+  construction. Seven days of data is too little to say anything about real demand.
+- An earlier version of this README reported LightGBM well ahead. That comparison used a broken
+  hour-of-day baseline (it always fell back to the overall mean), had no "same hour yesterday"
+  baseline, and back-filled the first hours' lag features. All three are fixed.
 
 ## How it works
 
@@ -117,7 +131,8 @@ flowchart TD
 - **Scheduled job.** Every five minutes Gold is recomputed from Silver to correct any drift from
   incremental updates. It can also be run from the Pipeline view.
 - **No future leakage.** Walk-forward `TimeSeriesSplit`, lag and rolling features shifted by at least
-  one hour, and a test that changes future demand and asserts no earlier feature moves.
+  one hour, and the first 24 hours dropped rather than back-filled. A test changes demand from each
+  hour onwards, the first included, and asserts that no feature of that hour or earlier moves.
 - **Monitoring.** `GET /api/v1/health/` reports tier counts, queue state, throughput, retries, failed
   events, job results, recent runs and validation checks; the server logs every retry and failure.
 
@@ -144,7 +159,7 @@ Honest state of each item. "Partial" means some of it exists but it is not what 
 | Data | Idempotency and deduplication | Done and tested. |
 | Data | SQL transformations | Done in SQLAlchemy. **Partial** for dbt: models exist in `dbt_project/` but are not wired to a profile or run. |
 | ML | Exploratory analysis | Done, generated with Polars. |
-| ML | Features, baseline, forecasting model | Done. |
+| ML | Features, baseline, forecasting model | Done. Three baselines; on this data LightGBM is not shown to beat the best of them. |
 | ML | Anomaly detection | Done. |
 | ML | Time-aware validation | Done and tested. |
 | ML | Experiment tracking | **Partial.** Runs are appended to a JSON registry; MLflow is not installed or used. |
