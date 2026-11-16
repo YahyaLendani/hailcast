@@ -9,7 +9,8 @@ services:
     rootDir: backend
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/info
-    autoDeploy: true
+    # Deploy only after the GitHub Actions checks on master pass.
+    autoDeployTrigger: checksPass
     envVars:
       # Locks the upload endpoints on the public demo. Render generates the value;
       # read it in the service's Environment tab if you need to upload data.
