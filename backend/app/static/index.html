@@ -821,7 +821,9 @@
       if (!btn) return;
       btn.disabled = true;
       btn.textContent = 'Running…';
-      guard(api(`/health/jobs/${encodeURIComponent(btn.dataset.job)}/run`, { method: 'POST' }).then(loadSummary, err => loadSummary().then(() => { throw err; })));
+      api(`/health/jobs/${encodeURIComponent(btn.dataset.job)}/run`, { method: 'POST' }).then(
+        () => guard(loadSummary()),
+        err => guard(loadSummary()).then(() => showNotice(`The job did not run. ${err.message}`)));
     });
 
     /* Filters shared by the Demand and Trips views */

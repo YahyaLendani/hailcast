@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.core.database import get_db
@@ -7,6 +9,7 @@ from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand, PipelineRun
 from app.services.streaming_worker import streaming_worker
 from app.services.scheduler import scheduler
 from app.core.clock import utc_now
+from app.core.security import limit_expensive_action
 
 router = APIRouter(prefix="/health", tags=["Health & Monitoring"])
 
@@ -85,9 +88,10 @@ async def get_pipeline_health(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/jobs/{name}/run")
-async def run_scheduled_job(name: str):
+async def run_scheduled_job(name: str, x_api_key: Optional[str] = Header(default=None)):
     """Run one scheduled job immediately instead of waiting for its interval."""
     if name not in scheduler.jobs:
         raise HTTPException(status_code=404, detail=f"Unknown job: {name}")
+    limit_expensive_action(f"job:{name}", x_api_key)
     return await scheduler.run_job(name)
 

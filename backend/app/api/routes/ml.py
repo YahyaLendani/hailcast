@@ -1,7 +1,7 @@
 import asyncio
 import pandas as pd
 from typing import List, Dict, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
@@ -16,6 +16,7 @@ from app.ml.models import LightGBMDemandForecaster
 from app.ml.tracking import experiment_tracker
 from app.services.anomaly_detector import anomaly_detector
 from app.core.clock import utc_now
+from app.core.security import limit_expensive_action
 
 router = APIRouter(prefix="/ml", tags=["Machine Learning"])
 
@@ -61,8 +62,10 @@ async def train_and_score(db: AsyncSession) -> Dict:
 
 
 @router.post("/train")
-async def trigger_training(db: AsyncSession = Depends(get_db)):
+async def trigger_training(db: AsyncSession = Depends(get_db),
+                           x_api_key: Optional[str] = Header(default=None)):
     """Train gradient-boosting model and compare against baselines using time-aware validation."""
+    limit_expensive_action("train", x_api_key)
     try:
         train_summary = await train_and_score(db)
     except ValueError as exc:

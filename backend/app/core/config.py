@@ -46,8 +46,14 @@ class Settings(BaseSettings):
     # When set, upload endpoints require this value in the X-API-Key header
     API_KEY: str = ""
 
-    # CORS
-    CORS_ORIGINS: List[str] = ["*"]
+    # Seconds between public calls that retrain the model or run a pipeline job,
+    # shared by all callers. A valid X-API-Key skips the wait; 0 turns it off.
+    EXPENSIVE_ACTION_COOLDOWN_SECONDS: float = 300.0
+
+    # Browser origins allowed to call the API from another site. The served dashboard
+    # is same-origin and needs none; this default lets the local Next.js prototype
+    # in frontend/ reach a local backend.
+    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
 
     model_config = SettingsConfigDict(
         env_file=".env",

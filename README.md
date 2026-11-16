@@ -152,6 +152,7 @@ Honest state of each item. "Partial" means some of it exists but it is not what 
 | Backend | Analytics API, batch ingestion | Done (FastAPI). |
 | Backend | WebSocket or SSE updates | Done, both. |
 | Backend | Authentication | Done where required: an API key locks the upload endpoints on the hosted demo. No user accounts. |
+| Backend | Security review | Done: [docs/security.md](docs/security.md). Retraining and pipeline jobs have a cooldown, and CORS allows only configured origins. |
 | Data | Public dataset imported | **Not done.** The sample is generated, not downloaded from NYC TLC. |
 | Data | Batch ingestion, simulated streaming, replay | Done; replayed data is labelled. |
 | Data | Bronze, Silver, Gold | Done. |
