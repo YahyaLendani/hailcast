@@ -25,9 +25,11 @@ sudo apt-get install -y git iptables-persistent
 sudo usermod -aG docker "$USER"
 
 # Oracle's Ubuntu images reject everything but SSH in iptables, on top of the cloud security list.
+# Insert the web ports just before that catch-all REJECT rule (its position varies by image).
 for port in 80 443; do
-  sudo iptables -C INPUT -p tcp --dport "$port" -m state --state NEW -j ACCEPT 2>/dev/null \
-    || sudo iptables -I INPUT 6 -p tcp --dport "$port" -m state --state NEW -j ACCEPT
+  sudo iptables -D INPUT -p tcp --dport "$port" -m state --state NEW -j ACCEPT 2>/dev/null || true
+  pos=$(sudo iptables -L INPUT -n --line-numbers | awk '$2 == "REJECT" { print $1; exit }')
+  sudo iptables -I INPUT "${pos:-1}" -p tcp --dport "$port" -m state --state NEW -j ACCEPT
 done
 sudo netfilter-persistent save
 
