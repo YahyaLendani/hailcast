@@ -48,3 +48,27 @@ def test_every_zone_pair_has_a_route():
         for b in ZONES:
             if a != b:
                 assert len(routes[f"{a}-{b}"]["points"]) >= 2, f"{a}-{b}"
+
+
+def test_gps_trips_keep_real_timing():
+    from httpx import ASGITransport, AsyncClient
+    from app.main import app
+
+    async def scenario():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            listing = (await client.get("/api/v1/analytics/gps-trips")).json()
+            assert listing["source"]["licence"] == "CC BY 4.0"
+            assert len(listing["trips"]) >= 100
+            assert "points" not in listing["trips"][0]
+
+            trip = (await client.get(f"/api/v1/analytics/gps-trips/{listing['trips'][0]['id']}")).json()
+            times = [p[2] for p in trip["points"]]
+            assert times[0] == 0 and times == sorted(times)
+            assert times[-1] == trip["duration_s"]  # the path ends exactly when the trip did
+            assert len(trip["speeds"]) == trip["gps_fixes"] - 1  # one speed per 15-second leg
+            assert all(0 <= s <= 130 for _, s in trip["speeds"])
+            assert 0 <= trip["compare"]["slower_than_percent"] <= 100
+
+            assert (await client.get("/api/v1/analytics/gps-trips/nope")).status_code == 404
+
+    run(scenario())

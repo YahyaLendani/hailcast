@@ -177,6 +177,50 @@ async def get_trip_detail(trip_id: int, db: AsyncSession = Depends(get_db)):
     }
 
 
+@lru_cache(maxsize=1)
+def _gps_sample() -> dict:
+    """Real Porto taxi trips with GPS, built by backend/scripts/build_porto_sample.py."""
+    path = settings.DATA_DIR / "porto_trips.json"
+    if not path.exists():
+        return {"source": None, "trips": []}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+_GPS_SUMMARY_FIELDS = ("id", "start", "call_type", "snapped_to_roads", "duration_s", "distance_km",
+                       "avg_kmh", "max_kmh", "stopped_s", "gps_fixes")
+
+
+@router.get("/gps-trips")
+async def list_gps_trips():
+    """Real taxi trips from Porto with a GPS fix every 15 seconds (CC BY 4.0 sample)."""
+    sample = _gps_sample()
+    return {
+        "source": sample["source"],
+        "trips": [{k: t[k] for k in _GPS_SUMMARY_FIELDS} for t in sample["trips"]],
+    }
+
+
+@router.get("/gps-trips/{trip_id}")
+async def get_gps_trip(trip_id: str):
+    """One real trip: its road-snapped path with a time for every point, speed per 15 seconds,
+    and how it compares with the rest of the sample."""
+    trips = _gps_sample()["trips"]
+    trip = next((t for t in trips if t["id"] == trip_id), None)
+    if trip is None:
+        raise HTTPException(status_code=404, detail="GPS trip not found")
+    speeds = [t["avg_kmh"] for t in trips]
+    return {
+        **trip,
+        "compare": {
+            "sample_trips": len(trips),
+            "slower_than_percent": round(100 * sum(s < trip["avg_kmh"] for s in speeds) / len(speeds), 1),
+            "sample_avg_kmh": round(sum(speeds) / len(speeds), 1),
+            "sample_avg_minutes": round(sum(t["duration_s"] for t in trips) / len(trips) / 60, 1),
+            "sample_avg_km": round(sum(t["distance_km"] for t in trips) / len(trips), 2),
+        },
+    }
+
+
 @router.get("/filters")
 async def get_filter_options(db: AsyncSession = Depends(get_db)):
     """Values the dashboard can filter by: pickup zones, payment types and the date span."""

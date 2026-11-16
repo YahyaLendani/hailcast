@@ -12,7 +12,8 @@ machine learning and deployment-readiness in one runnable system.
 > **About the data.** The trips are **synthetic**: `backend/app/data/download_sample.py` generates
 > about 10,700 records shaped like NYC TLC yellow-taxi trips, with a fixed random seed. The "live"
 > stream is those historical records **replayed**; every row carries `is_replayed = true` and the
-> dashboard says so. Nothing here is real or current traffic.
+> dashboard says so. None of it is real or current NYC traffic. The one real dataset is a sample of
+> 150 Porto taxi trips with GPS, used only by the Trip map (see below).
 
 ![The Forecast view: observed demand, the LightGBM forecast with its range, and the walk-forward validation table](docs/screenshot-forecast.jpg)
 
@@ -26,7 +27,7 @@ machine learning and deployment-readiness in one runnable system.
 | **Anomalies** | Zone-hours whose demand is unusual (Isolation Forest, z-score fallback). |
 | **Pipeline** | Row counts per tier, validation checks, batch runs, stream failures, retries and scheduled jobs. |
 | **Trips** | Cleaned trip records, filterable by zone, payment type and date. |
-| **Trip map** | One trip on a street map: pickup, drop-off, the likely road route with a cab you can play along it, speed, fare, tip, and how the trip compares to the city and to the same zone-to-zone run. |
+| **Trip map** | Real taxi trips from Porto with GPS: the path the cab drove, played back at the recorded speed (10x to 60x) with a speed chart, top speed and time stopped. Also any NYC sample trip on its likely road route, with fare, tip and comparisons. |
 
 ## Quick start
 
@@ -134,11 +135,15 @@ flowchart TD
 - **No future leakage.** Walk-forward `TimeSeriesSplit`, lag and rolling features shifted by at least
   one hour, and the first 24 hours dropped rather than back-filled. A test changes demand from each
   hour onwards, the first included, and asserts that no feature of that hour or earlier moves.
-- **Trip map.** The records hold pickup and drop-off zones, not GPS points (as in real TLC data
-  since 2016), so the map draws the likely road route between the two zone centres, not the path the
-  cab drove, and says so. Routes come from OpenStreetMap data via the OSRM demo server, fetched once
-  by `backend/scripts/build_zone_routes.py` and stored in `backend/app/data/zone_routes.json`, so the
-  running app does not depend on it. Map tiles are from OpenStreetMap.
+- **Trip map, real GPS.** 150 real trips from the public Porto taxi dataset
+  ([UCI, ECML PKDD 2015](https://doi.org/10.24432/C55W25), CC BY 4.0) with a GPS fix every 15 seconds.
+  `backend/scripts/build_porto_sample.py` picks a spread of clean trips, snaps each one to the roads
+  with OSRM map matching and gives every point of the path a time, so the cab on the map moves at the
+  recorded speed, including stops. Thinning the path uses a time-aware distance so stops survive.
+- **Trip map, NYC sample.** These records hold zones, not GPS (as in real TLC data since 2016), so
+  the map draws the likely road route between zone centres at the trip's average speed and says so.
+  Routes come from `backend/scripts/build_zone_routes.py`. Both builders call the OSRM demo server
+  once, offline; the running app only reads the JSON files. Map tiles are from OpenStreetMap.
 - **Monitoring.** `GET /api/v1/health/` reports tier counts, queue state, throughput, retries, failed
   events, job results, recent runs and validation checks; the server logs every retry and failure.
 
@@ -159,7 +164,7 @@ Honest state of each item. "Partial" means some of it exists but it is not what 
 | Backend | WebSocket or SSE updates | Done, both. |
 | Backend | Authentication | Done where required: an API key locks the upload endpoints on the hosted demo. No user accounts. |
 | Backend | Security review | Done: [docs/security.md](docs/security.md). Retraining and pipeline jobs have a cooldown, and CORS allows only configured origins. |
-| Data | Public dataset imported | **Not done.** The sample is generated, not downloaded from NYC TLC. |
+| Data | Public dataset imported | **Partial.** 150 real Porto taxi trips with GPS (UCI, CC BY 4.0) power the Trip map. The NYC pipeline still runs on the generated sample, not on downloaded TLC data. |
 | Data | Batch ingestion, simulated streaming, replay | Done; replayed data is labelled. |
 | Data | Bronze, Silver, Gold | Done. |
 | Data | Validation and quality checks | Done. |

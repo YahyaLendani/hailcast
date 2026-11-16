@@ -305,6 +305,12 @@
     .trip-figs dd small { font-size: 13px; font-weight: 500; color: var(--ink-3); }
     .compare-list li { padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
     .compare-list b { font-weight: 700; }
+    .filters[hidden] { display: none; }
+    .map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin: 0 0 16px; }
+    .scrub { width: 100%; margin: 10px 0 0; accent-color: var(--ink); }
+    .speed-box { position: relative; height: 170px; margin-top: 14px; }
+    .source-note { font-size: 13px; color: var(--ink-3); margin-top: 8px; }
+    .source-note a { color: inherit; }
     .link-btn { font: inherit; font-size: 13px; font-weight: 600; color: var(--blue); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
     @media (max-width: 900px) {
       .map-layout { grid-template-columns: 1fr; }
@@ -649,33 +655,47 @@
     <section class="panel" role="tabpanel" id="panel-map" aria-labelledby="tab-map" hidden>
       <div class="section-head">
         <h2>Trip map</h2>
-        <p class="hint">Pick a trip to see where it went, how fast it moved and how it compares. Records hold pickup and drop-off zones, not GPS, so the line is the likely road route between them.</p>
+        <p class="hint" id="map-intro"></p>
+      </div>
+      <div class="map-controls">
+        <span class="seg" role="radiogroup" aria-label="Trip data">
+          <label><input type="radio" name="map-source" value="gps" checked><span>Real GPS, Porto</span></label>
+          <label><input type="radio" name="map-source" value="nyc"><span>Replayed sample, NYC</span></label>
+        </span>
+        <span class="seg" role="radiogroup" aria-label="Playback speed">
+          <label><input type="radio" name="map-rate" value="10"><span>10×</span></label>
+          <label><input type="radio" name="map-rate" value="30" checked><span>30×</span></label>
+          <label><input type="radio" name="map-rate" value="60"><span>60×</span></label>
+        </span>
       </div>
       <div class="map-layout">
         <div>
-          <form class="filters" id="map-filters" aria-label="Filter trips on the map">
+          <form class="filters" id="map-filters" aria-label="Filter trips on the map" hidden>
             <label>Pickup zone
               <select id="map-zone"><option value="">All zones</option></select>
             </label>
           </form>
-          <div class="trip-pick" id="map-trips" aria-label="Recent trips"><p class="empty">Loading…</p></div>
+          <div class="trip-pick" id="map-trips" aria-label="Trips"><p class="empty">Loading…</p></div>
         </div>
         <div>
           <div class="map-box" id="trip-map" role="region" aria-label="Map of the selected trip"></div>
+          <input class="scrub" id="map-scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="Position in the trip" disabled>
           <div class="map-bar">
             <button class="btn btn-primary" id="map-play" type="button" disabled>Play trip</button>
-            <div class="readouts" aria-live="polite">
+            <div class="readouts" aria-live="off">
               <span>Trip clock <b class="num" id="map-clock">—</b></span>
               <span>Covered <b class="num" id="map-covered">—</b></span>
-              <span>Average speed <b class="num" id="map-speed">—</b></span>
+              <span><span id="map-speed-label">Speed now</span> <b class="num" id="map-speed">—</b></span>
             </div>
           </div>
-          <div class="map-legend"><span><i style="background:var(--ok)"></i>Pickup</span><span><i style="background:var(--alert)"></i>Drop-off</span><span><i class="line"></i>Likely road route</span><span><i style="background:var(--yellow)"></i>Cab</span></div>
+          <div class="map-legend"><span><i style="background:var(--ok)"></i>Pickup</span><span><i style="background:var(--alert)"></i>Drop-off</span><span><i class="line"></i><span id="map-line-label">Path driven</span></span><span><i style="background:var(--yellow)"></i>Cab</span></div>
           <p class="hint" id="map-note" style="margin-top:8px"></p>
+          <div class="speed-box" id="map-speed-box"><canvas id="map-speed-chart" aria-label="Speed through the trip"></canvas></div>
           <h3 id="map-title" style="margin-top:20px">Choose a trip</h3>
           <dl class="trip-figs" id="map-figs"></dl>
           <div class="section-head"><h2>How it compares</h2></div>
           <ul class="compare-list" id="map-compare"><li class="empty">Choose a trip to compare it.</li></ul>
+          <p class="source-note" id="map-source-note"></p>
         </div>
       </div>
     </section>
@@ -1141,7 +1161,16 @@
     }
 
     /* ---------- Trip map ---------- */
-    const mapState = { map: null, layer: null, cab: null, selected: null, detail: null, path: null, anim: 0 };
+    // Two sources. "gps": real Porto trips, a GPS fix every 15 s, snapped to roads, every point timed.
+    // "nyc": the replayed sample, which only records zones, so the route is an estimate and the
+    // cab moves at the trip's average speed.
+    const mapState = { source: 'gps', rate: 30, map: null, layer: null, cab: null, selected: null, detail: null,
+                       path: null, t: 0, anim: 0, gpsList: null, gpsSource: null, speedChart: null };
+    const kmFmt = v => `${n1.format(v)} km`;
+    const INTRO = {
+      gps: 'Real taxi trips from Porto, Portugal, with a GPS fix every 15 seconds. Each trip is snapped to the roads and keeps its real timing, so the cab speeds up, slows down and stops where the taxi did.',
+      nyc: 'Trips from the replayed NYC sample. These records hold pickup and drop-off zones, not GPS, so the line is the likely road route between the zones and the cab moves at the trip\u2019s average speed.'
+    };
     let leafletReady = null;
     function loadLeaflet() {
       if (window.L) return Promise.resolve();
@@ -1161,20 +1190,52 @@
     }
     function ensureMap() {
       if (mapState.map) { mapState.map.invalidateSize(); return; }
-      const map = L.map('trip-map', { zoomControl: true, scrollWheelZoom: false }).setView([40.75, -73.95], 11);
+      const map = L.map('trip-map', { zoomControl: true, scrollWheelZoom: false }).setView([41.16, -8.62], 12);
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors; routes by OSRM'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors; roads matched with OSRM'
       }).addTo(map);
       mapState.map = map;
       mapState.layer = L.layerGroup().addTo(map);
     }
+    function haversineKm(a, b) {
+      const R = 6371.0088, rad = Math.PI / 180;
+      const dLat = (b[0] - a[0]) * rad, dLon = (b[1] - a[1]) * rad;
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(h));
+    }
+    function clock(sec) {
+      const v = Math.round(sec);
+      return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
+    }
+    const startFmt = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const localStart = iso => startFmt.format(new Date(iso));
+
+    /* Lists */
+    function setCurrent(id) {
+      document.querySelectorAll('#map-trips [data-trip]').forEach(b => b.setAttribute('aria-current', String(b.dataset.trip === String(id))));
+    }
+    async function loadGpsList() {
+      if (!mapState.gpsList) {
+        const data = await api('/analytics/gps-trips');
+        mapState.gpsList = data.trips;
+        mapState.gpsSource = data.source;
+      }
+      const trips = mapState.gpsList;
+      $('map-trips').innerHTML = trips.length ? trips.map(t => `
+        <button type="button" data-trip="${esc(t.id)}" aria-current="${t.id === mapState.selected}">
+          <span class="route">${esc(localStart(t.start))}</span><span class="fare num">${clock(t.duration_s)} min</span>
+          <span class="sub num">${kmFmt(t.distance_km)} · average ${n1.format(t.avg_kmh)} km/h · top ${nf.format(t.max_kmh)} km/h</span>
+        </button>`).join('') : '<p class="empty">The GPS sample is not installed on this server.</p>';
+      if (trips.length && mapState.selected == null) await showTrip(trips[0].id);
+    }
     const tripLine = t => `${zoneName(t.pickup_location_id)} → ${zoneName(t.dropoff_location_id)}`;
-    async function loadMapTrips() {
+    async function loadNycList() {
       const q = new URLSearchParams({ limit: 30 });
       const zone = $('map-zone').value;
       if (zone) q.set('location_id', zone);
       const trips = await api('/analytics/trips?' + q);
+      if (mapState.source !== 'nyc') return;
       const box = $('map-trips');
       if (!trips.length) {
         box.innerHTML = `<p class="empty">${zone ? 'No trips from this zone yet.' : 'No cleaned trips yet. Start the replay to ingest some.'}</p>`;
@@ -1187,56 +1248,121 @@
         </button>`).join('');
       if (mapState.selected == null) await showTrip(trips[0].id);
     }
-    function haversine(a, b) {
-      const R = 3958.8, rad = Math.PI / 180;
-      const dLat = (b[0] - a[0]) * rad, dLon = (b[1] - a[1]) * rad;
-      const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLon / 2) ** 2;
-      return 2 * R * Math.asin(Math.sqrt(h));
+    const loadMapTrips = () => mapState.source === 'gps' ? loadGpsList() : loadNycList();
+
+    /* Playback: the path is a list of [lat, lon, seconds]; the cab is where the taxi was at time t. */
+    function positionAt(t) {
+      const pts = mapState.path.pts;
+      if (t <= pts[0][2]) return { at: pts[0], i: 1 };
+      let lo = 1, hi = pts.length - 1;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (pts[mid][2] < t) lo = mid + 1; else hi = mid; }
+      const a = pts[lo - 1], b = pts[lo], span = b[2] - a[2] || 1, k = Math.min(1, Math.max(0, (t - a[2]) / span));
+      return { at: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k], i: lo, k };
     }
-    function mins(m) {
-      const secs = Math.round(m * 60);
-      return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-    }
-    function setProgress(f) {
-      const d = mapState.detail; if (!d) return;
-      const t = d.trip, total = t.trip_duration_minutes || 0;
-      $('map-clock').textContent = `${mins(total * f)} of ${mins(total)}`;
-      $('map-covered').textContent = `${n1.format(t.trip_distance * f)} of ${n1.format(t.trip_distance)} mi`;
-      const path = mapState.path;
-      if (!path || !mapState.cab) return;
-      const target = path.total * f;
-      let i = 1;
-      while (i < path.cum.length - 1 && path.cum[i] < target) i++;
-      const seg = path.cum[i] - path.cum[i - 1] || 1, k = Math.min(1, Math.max(0, (target - path.cum[i - 1]) / seg));
-      const a = path.pts[i - 1], b = path.pts[i];
-      mapState.cab.setLatLng([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]);
+    function setTime(t) {
+      const d = mapState.detail, path = mapState.path;
+      if (!d || !path) return;
+      t = Math.min(path.duration, Math.max(0, t));
+      mapState.t = t;
+      const { at, i, k } = positionAt(t);
+      if (mapState.cab) mapState.cab.setLatLng(at);
+      $('map-clock').textContent = `${clock(t)} of ${clock(path.duration)}`;
+      $('map-scrub').value = Math.round(1000 * t / path.duration);
+      if (mapState.source === 'gps') {
+        const done = (path.cum[i - 1] || 0) + ((path.cum[i] || 0) - (path.cum[i - 1] || 0)) * (k || 0);
+        $('map-covered').textContent = `${n1.format(done)} of ${kmFmt(path.cum[path.cum.length - 1])}`;
+        const leg = d.speeds[Math.min(d.speeds.length - 1, Math.floor(t / 15))];
+        $('map-speed').textContent = leg ? `${nf.format(leg[1])} km/h` : '—';
+        if (mapState.speedChart) { mapState.speedChart.$cursor = t / 60; mapState.speedChart.draw(); }
+      } else {
+        const miles = d.trip.trip_distance * t / path.duration;
+        $('map-covered').textContent = `${n1.format(miles)} of ${n1.format(d.trip.trip_distance)} mi`;
+      }
     }
     function stopAnim() { cancelAnimationFrame(mapState.anim); mapState.anim = 0; $('map-play').textContent = 'Play trip'; }
     function playTrip() {
       if (mapState.anim) { stopAnim(); return; }
-      if (reduce) { setProgress(1); return; }
-      const ms = 8000, t0 = performance.now();
-      $('map-play').textContent = 'Stop';
+      const path = mapState.path; if (!path) return;
+      if (mapState.t >= path.duration) setTime(0);
+      let last = performance.now();
+      $('map-play').textContent = 'Pause';
       const step = now => {
-        const f = Math.min(1, (now - t0) / ms);
-        setProgress(f);
-        if (f < 1) mapState.anim = requestAnimationFrame(step); else stopAnim();
+        setTime(mapState.t + (now - last) / 1000 * mapState.rate);
+        last = now;
+        if (mapState.t < path.duration) mapState.anim = requestAnimationFrame(step); else stopAnim();
       };
       mapState.anim = requestAnimationFrame(step);
     }
-    async function showTrip(id) {
-      stopAnim();
-      mapState.selected = id;
-      document.querySelectorAll('#map-trips [data-trip]').forEach(b => b.setAttribute('aria-current', String(Number(b.dataset.trip) === id)));
-      const d = await api(`/analytics/trips/${id}`);
-      if (mapState.selected !== id) return;
-      mapState.detail = d;
+
+    /* Speed chart with a cursor at the cab's moment */
+    const cursorPlugin = {
+      id: 'cursor',
+      afterDatasetsDraw(chart) {
+        if (chart.$cursor == null) return;
+        const x = chart.scales.x.getPixelForValue(chart.$cursor), { top, bottom } = chart.chartArea, ctx = chart.ctx;
+        ctx.save(); ctx.strokeStyle = css('--ink'); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke(); ctx.restore();
+      }
+    };
+    function drawSpeedChart(d) {
+      const box = $('map-speed-box');
+      if (mapState.speedChart) { mapState.speedChart.destroy(); mapState.speedChart = null; }
+      box.hidden = !d.speeds;
+      if (!d.speeds) return;
+      const data = d.speeds.map(([t, v]) => ({ x: (t + 7.5) / 60, y: v }));
+      mapState.speedChart = new Chart($('map-speed-chart'), {
+        type: 'line',
+        data: { datasets: [{ data, borderColor: css('--blue'), backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: .3 }] },
+        options: {
+          animation: false, responsive: true, maintainAspectRatio: false, parsing: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { title: i => `Minute ${n1.format(i[0].parsed.x)}`, label: i => `${nf.format(i.parsed.y)} km/h` } } },
+          scales: {
+            x: { type: 'linear', min: 0, max: d.duration_s / 60, title: { display: true, text: 'Minutes into the trip', color: css('--ink-3') }, ticks: { color: css('--ink-3') }, grid: { color: css('--rule') } },
+            y: { min: 0, title: { display: true, text: 'km/h', color: css('--ink-3') }, ticks: { color: css('--ink-3') }, grid: { color: css('--rule') } }
+          },
+          onClick: (evt, _, chart) => { stopAnim(); setTime(chart.scales.x.getValueForPixel(evt.x) * 60); }
+        },
+        plugins: [cursorPlugin]
+      });
+    }
+
+    /* Show one trip */
+    const fig = (label, value, small) => `<div><dt>${label}</dt><dd class="num">${value}${small ? ` <small>${small}</small>` : ''}</dd></div>`;
+    const pct = v => v == null ? '—' : `${n1.format(v)}%`;
+    function describeGps(d) {
+      $('map-title').textContent = `${localStart(d.start)} in Porto, ${clock(d.duration_s)} min`;
+      const share = Number(d.snapped_to_roads) || 0;
+      $('map-note').textContent = `${d.gps_fixes} GPS fixes, one every 15 seconds. The cab moves at the recorded speed between fixes. `
+        + (share >= 1 ? 'Every 15-second leg is snapped to the roads.'
+          : `${Math.round(share * 100)}% of the 15-second legs are snapped to the roads; the rest are straight lines between fixes where the matcher could not place them.`);
+      $('map-speed-label').textContent = 'Speed now';
+      $('map-line-label').textContent = 'Path driven';
+      $('map-figs').innerHTML = [
+        fig('Duration', `${clock(d.duration_s)} min`),
+        fig('Distance', kmFmt(d.distance_km)),
+        fig('Average speed', `${n1.format(d.avg_kmh)} km/h`),
+        fig('Top speed', `${nf.format(d.max_kmh)} km/h`),
+        fig('Stopped', `${clock(d.stopped_s)} min`, pct(100 * d.stopped_s / d.duration_s)),
+        fig('Started', esc(localStart(d.start))),
+        fig('How it began', esc(d.call_type)),
+        fig('GPS fixes', nf.format(d.gps_fixes))
+      ].join('');
+      const c = d.compare;
+      $('map-compare').innerHTML = [
+        `Faster on average than <b>${pct(c.slower_than_percent)}</b> of the ${nf.format(c.sample_trips)} trips in the sample (sample average <b>${n1.format(c.sample_avg_kmh)} km/h</b>).`,
+        `The sample's average trip takes <b>${n1.format(c.sample_avg_minutes)} min</b> and covers <b>${kmFmt(c.sample_avg_km)}</b>; this one took <b>${clock(d.duration_s)} min</b> for <b>${kmFmt(d.distance_km)}</b>.`,
+        `It spent <b>${clock(d.stopped_s)} min</b> stopped or crawling below 3 km/h, and its fastest 15 seconds averaged <b>${nf.format(d.max_kmh)} km/h</b>.`
+      ].map(x => `<li>${x}</li>`).join('');
+      const src = mapState.gpsSource;
+      $('map-source-note').innerHTML = src ? `Data: <a href="${esc(src.url)}">${esc(src.name)}</a>, ${esc(src.publisher)}, ${esc(src.licence)}. Roads: OpenStreetMap, matched with OSRM.` : '';
+    }
+    function describeNyc(d) {
       const t = d.trip;
       $('map-title').textContent = `${d.pickup.zone_name} → ${d.dropoff.zone_name}, ${when(t.pickup_datetime)}`;
-      $('map-note').textContent = d.route_note;
+      $('map-note').textContent = d.route_note + (d.route ? ' The record has only an average speed, so the cab moves at that speed throughout.' : '');
+      $('map-speed-label').textContent = 'Average speed';
+      $('map-line-label').textContent = 'Likely road route';
       $('map-speed').textContent = t.speed_mph != null ? `${n1.format(t.speed_mph)} mph` : '—';
-      const pct = v => v == null ? '—' : `${n1.format(v)}%`;
-      const fig = (label, value, small) => `<div><dt>${label}</dt><dd class="num">${value}${small ? ` <small>${small}</small>` : ''}</dd></div>`;
       $('map-figs').innerHTML = [
         fig('Duration', `${n1.format(t.trip_duration_minutes || 0)} min`),
         fig('Distance', `${n1.format(t.trip_distance)} mi`),
@@ -1254,46 +1380,97 @@
       else items.push('This is the only trip on this zone-to-zone run so far.');
       if (d.route) items.push(`Driving the likely road route is about <b>${n1.format(d.route.road_miles)} mi</b> and <b>${n1.format(d.route.drive_minutes)} min</b> in free-flowing traffic. The trip record says <b>${n1.format(t.trip_distance)} mi</b> and <b>${n1.format(t.trip_duration_minutes || 0)} min</b>; the sample is synthetic, so the two need not match.`);
       $('map-compare').innerHTML = items.map(x => `<li>${x}</li>`).join('');
+      $('map-source-note').textContent = 'Data: synthetic sample shaped like NYC TLC records. Roads: OpenStreetMap, routed with OSRM.';
+    }
+    async function showTrip(id) {
+      stopAnim();
+      mapState.selected = id;
+      setCurrent(id);
+      const source = mapState.source;
+      const d = await api(source === 'gps' ? `/analytics/gps-trips/${encodeURIComponent(id)}` : `/analytics/trips/${id}`);
+      if (mapState.selected !== id || mapState.source !== source) return;
+      mapState.detail = d;
+      if (source === 'gps') describeGps(d); else describeNyc(d);
 
       await loadLeaflet();
       ensureMap();
       const layer = mapState.layer;
       layer.clearLayers();
-      const ink = css('--ink'), A = [d.pickup.lat, d.pickup.lon];
+      const ink = css('--ink');
       const dot = (pt, color, label) => L.circleMarker(pt, { radius: 9, color: ink, weight: 3, fillColor: color, fillOpacity: 1 }).bindTooltip(label).addTo(layer);
-      if (d.route) {
-        const pts = d.route.points;
-        L.polyline(pts, { color: ink, weight: 8, opacity: .35 }).addTo(layer);
-        const line = L.polyline(pts, { color: css('--blue'), weight: 5 }).addTo(layer);
+
+      let pts = null;
+      if (source === 'gps') {
+        pts = d.points;
+      } else if (d.route) {
+        // Spread the recorded duration along the estimated route at a constant speed.
+        const r = d.route.points, cum = [0];
+        for (let i = 1; i < r.length; i++) cum.push(cum[i - 1] + haversineKm(r[i - 1], r[i]));
+        const total = cum[cum.length - 1] || 1, dur = (d.trip.trip_duration_minutes || 0) * 60;
+        pts = r.map((p, i) => [p[0], p[1], dur * cum[i] / total]);
+      }
+      if (pts) {
         const cum = [0];
-        for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + haversine(pts[i - 1], pts[i]));
-        mapState.path = { pts, cum, total: cum[cum.length - 1] };
-        dot(pts[0], css('--ok'), `Pickup: ${d.pickup.zone_name}`);
-        dot(pts[pts.length - 1], css('--alert'), `Drop-off: ${d.dropoff.zone_name}`);
+        for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + haversineKm(pts[i - 1], pts[i]));
+        mapState.path = { pts, cum, duration: pts[pts.length - 1][2] };
+        const latlngs = pts.map(p => [p[0], p[1]]);
+        L.polyline(latlngs, { color: ink, weight: 8, opacity: .35 }).addTo(layer);
+        const line = L.polyline(latlngs, { color: css('--blue'), weight: 5 }).addTo(layer);
+        dot(latlngs[0], css('--ok'), 'Pickup');
+        dot(latlngs[latlngs.length - 1], css('--alert'), 'Drop-off');
+        mapState.cab = L.marker(latlngs[0], {
+          icon: L.divIcon({ className: 'cab-icon', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] }),
+          interactive: false, keyboard: false
+        }).addTo(layer);
         mapState.map.fitBounds(line.getBounds(), { padding: [36, 36] });
       } else {
         mapState.path = null;
+        mapState.cab = null;
+        const A = [d.pickup.lat, d.pickup.lon];
         L.circle(A, { radius: 600, color: ink, weight: 1.5, fillColor: css('--blue'), fillOpacity: .12, dashArray: '4 6' }).addTo(layer);
         dot(A, css('--ok'), `Pickup and drop-off: ${d.pickup.zone_name}`);
         mapState.map.setView(A, 14);
+        ['map-clock', 'map-covered'].forEach(k => { $(k).textContent = '—'; });
       }
-      mapState.cab = d.route ? L.marker(d.route.points[0], {
-        icon: L.divIcon({ className: 'cab-icon', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] }),
-        interactive: false, keyboard: false
-      }).addTo(layer) : null;
-      $('map-play').disabled = !d.route;
-      setProgress(0);
+      $('map-play').disabled = $('map-scrub').disabled = !mapState.path;
+      drawSpeedChart(source === 'gps' ? d : {});
+      mapState.t = 0;
+      setTime(0);
     }
+
+    /* Controls */
     $('map-trips').addEventListener('click', e => {
       const b = e.target.closest('[data-trip]');
-      if (b) guard(showTrip(Number(b.dataset.trip)));
+      if (!b) return;
+      guard(showTrip(mapState.source === 'gps' ? b.dataset.trip : Number(b.dataset.trip)));
     });
     $('map-filters').addEventListener('submit', e => e.preventDefault());
-    $('map-zone').addEventListener('change', () => { mapState.selected = null; guard(loadMapTrips()); });
+    $('map-zone').addEventListener('change', () => { mapState.selected = null; guard(loadNycList()); });
     $('map-play').addEventListener('click', playTrip);
+    $('map-scrub').addEventListener('input', e => {
+      stopAnim();
+      if (mapState.path) setTime(mapState.path.duration * e.target.value / 1000);
+    });
+    document.querySelectorAll('input[name="map-rate"]').forEach(r => r.addEventListener('change', () => { mapState.rate = Number(r.value); }));
+    function setSource(source) {
+      if (mapState.source === source && mapState.detail) return;
+      stopAnim();
+      mapState.source = source;
+      mapState.selected = null;
+      mapState.detail = null;
+      document.querySelector(`input[name="map-source"][value="${source}"]`).checked = true;
+      $('map-intro').textContent = INTRO[source];
+      $('map-filters').hidden = source !== 'nyc';
+      $('map-trips').innerHTML = '<p class="empty">Loading…</p>';
+    }
+    document.querySelectorAll('input[name="map-source"]').forEach(r => r.addEventListener('change', () => {
+      setSource(r.value);
+      guard(loadMapTrips());
+    }));
     $('trips-body').addEventListener('click', e => {
       const b = e.target.closest('[data-map-trip]');
       if (!b) return;
+      setSource('nyc');
       mapState.selected = Number(b.dataset.mapTrip);
       selectTab('map');
     });
@@ -1303,9 +1480,11 @@
         Object.entries(state.zones).sort((a, b) => a[1].localeCompare(b[1]))
           .forEach(([id, name]) => sel.add(new Option(name, id)));
       }
+      $('map-intro').textContent = INTRO[mapState.source];
+      $('map-filters').hidden = mapState.source !== 'nyc';
       const wanted = mapState.selected;
       await loadMapTrips();
-      if (wanted != null && (!mapState.detail || mapState.detail.trip.id !== wanted)) await showTrip(wanted);
+      if (wanted != null && (!mapState.detail || (mapState.detail.trip ? mapState.detail.trip.id : mapState.detail.id) !== wanted)) await showTrip(wanted);
       else if (mapState.map) mapState.map.invalidateSize();
     }
 
@@ -1357,7 +1536,7 @@
       const jobs = [loadSummary()];
       if (state.tab === 'demand') jobs.push(loadSeries(), loadZones());
       if (state.tab === 'trips') jobs.push(loadTrips());
-      if (state.tab === 'map' && !mapState.anim) jobs.push(loadMapTrips());
+      if (state.tab === 'map' && mapState.source === 'nyc' && !mapState.anim) jobs.push(loadNycList());
       if (state.tab === 'dispatch' && Date.now() - outlookAt > 6000) jobs.push(loadOutlook());
       guard(Promise.all(jobs));
     }
