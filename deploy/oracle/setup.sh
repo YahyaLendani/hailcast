@@ -8,8 +8,20 @@ set -euo pipefail
 REPO=https://github.com/YahyaLendani/hailcast.git
 DIR="$HOME/hailcast"
 
+# Leave a running server alone: stop if something already serves the web ports Caddy needs.
+busy=$(sudo ss -tlnH '( sport = :80 or sport = :443 )' || true)
+if [ -n "$busy" ]; then
+  echo "Ports 80/443 are already in use; not changing anything:"; echo "$busy"; exit 1
+fi
+
 sudo apt-get update -y
-sudo apt-get install -y docker.io docker-compose-v2 git iptables-persistent
+# Keep an existing Docker install (docker-ce from Docker's repo conflicts with Ubuntu's docker.io).
+if ! command -v docker >/dev/null; then
+  sudo apt-get install -y docker.io docker-compose-v2
+elif ! docker compose version >/dev/null 2>&1; then
+  echo "Docker is installed but without the compose plugin; install docker-compose-plugin, then rerun."; exit 1
+fi
+sudo apt-get install -y git iptables-persistent
 sudo usermod -aG docker "$USER"
 
 # Oracle's Ubuntu images reject everything but SSH in iptables, on top of the cloud security list.

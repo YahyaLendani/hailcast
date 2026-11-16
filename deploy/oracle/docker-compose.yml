@@ -2,6 +2,10 @@
 # collector, Postgres, Redis and Caddy for HTTPS. Setup steps: deploy/oracle/README.md.
 # Secrets come from deploy/oracle/.env, which is never committed.
 
+# A fixed project name keeps these containers, volumes and network apart from anything else
+# running under Docker on the same VM.
+name: hailcast
+
 services:
   postgres:
     image: postgres:16-alpine
