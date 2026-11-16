@@ -1,29 +1,19 @@
+import json
 from datetime import datetime
+from functools import lru_cache
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import case, desc, func, select
+from app.core.config import settings
 from app.core.database import get_db
+from app.core.zones import ZONES, ZONE_NAMES
 from app.models.events import SilverTrip, GoldHourlyDemand
 from app.schemas.analytics import AnalyticsOverview, HourlyDemandPoint, ZoneDemand
 from app.schemas.trip import TripResponse
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
-ZONE_NAMES = {
-    161: "Midtown Center",
-    236: "Upper East Side North",
-    237: "Upper East Side South",
-    186: "Penn Station / Madison Sq West",
-    142: "Lincoln Square East",
-    230: "Times Square / Theatre District",
-    138: "LaGuardia Airport",
-    132: "JFK Airport",
-    79:  "East Village",
-    148: "Lower East Side",
-    234: "Flatiron",
-    107: "Gramercy"
-}
 
 @router.get("/overview", response_model=AnalyticsOverview)
 async def get_overview(db: AsyncSession = Depends(get_db)):
@@ -110,6 +100,81 @@ async def get_trips(
     query = query.order_by(SilverTrip.pickup_datetime.desc()).offset(offset).limit(limit)
     res = await db.execute(query)
     return res.scalars().all()
+
+
+@lru_cache(maxsize=1)
+def _zone_routes() -> dict:
+    """Road routes between zone centres, precomputed by backend/scripts/build_zone_routes.py."""
+    path = settings.DATA_DIR / "zone_routes.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def _zone_point(location_id: int) -> dict:
+    name, lat, lon = ZONES.get(location_id, (f"Zone {location_id}", None, None))
+    return {"location_id": location_id, "zone_name": name, "lat": lat, "lon": lon}
+
+
+@router.get("/trips/{trip_id}")
+async def get_trip_detail(trip_id: int, db: AsyncSession = Depends(get_db)):
+    """One cleaned trip placed on the map, with derived figures and how it compares to others.
+
+    The records hold pickup and drop-off zones, not GPS points, so the route is the likely road
+    route between the two zone centres (OpenStreetMap data via OSRM), not the path the cab drove.
+    """
+    trip = await db.get(SilverTrip, trip_id)
+    if trip is None:
+        raise HTTPException(status_code=404, detail="Trip not found")
+
+    same_zone = trip.pickup_location_id == trip.dropoff_location_id
+    route = None if same_zone else _zone_routes().get(f"{trip.pickup_location_id}-{trip.dropoff_location_id}")
+
+    speed = trip.speed_mph or 0.0
+    total, slower, city_speed, city_fare_mile = (await db.execute(select(
+        func.count(SilverTrip.id),
+        func.sum(case((SilverTrip.speed_mph < speed, 1), else_=0)),
+        func.avg(SilverTrip.speed_mph),
+        func.avg(SilverTrip.fare_amount / func.nullif(SilverTrip.trip_distance, 0)),
+    ))).one()
+    pair_count, pair_fare, pair_minutes, pair_speed = (await db.execute(select(
+        func.count(SilverTrip.id),
+        func.avg(SilverTrip.total_amount),
+        func.avg(SilverTrip.trip_duration_minutes),
+        func.avg(SilverTrip.speed_mph),
+    ).where(
+        SilverTrip.pickup_location_id == trip.pickup_location_id,
+        SilverTrip.dropoff_location_id == trip.dropoff_location_id,
+    ))).one()
+
+    distance = trip.trip_distance or 0.0
+    minutes = trip.trip_duration_minutes or 0.0
+    return {
+        "trip": TripResponse.model_validate(trip).model_dump(mode="json"),
+        "pickup": _zone_point(trip.pickup_location_id),
+        "dropoff": _zone_point(trip.dropoff_location_id),
+        "same_zone": same_zone,
+        "route": route,
+        "route_note": (
+            "Pickup and drop-off are in the same zone, so there is no route between zones to draw."
+            if same_zone else
+            "The record has zones, not GPS points. The line is the likely road route between the two "
+            "zone centres, not the exact path the cab drove."
+        ),
+        "derived": {
+            "fare_per_mile": round(trip.fare_amount / distance, 2) if distance else None,
+            "fare_per_minute": round(trip.fare_amount / minutes, 2) if minutes else None,
+            "tip_percent": round(100 * (trip.tip_amount or 0) / trip.fare_amount, 1) if trip.fare_amount else None,
+        },
+        "compare": {
+            "all_trips": total,
+            "slower_than_percent": round(100 * (slower or 0) / total, 1) if total else None,
+            "city_avg_speed_mph": round(city_speed, 1) if city_speed is not None else None,
+            "city_avg_fare_per_mile": round(city_fare_mile, 2) if city_fare_mile is not None else None,
+            "same_route_trips": pair_count,
+            "same_route_avg_total": round(pair_fare, 2) if pair_fare is not None else None,
+            "same_route_avg_minutes": round(pair_minutes, 1) if pair_minutes is not None else None,
+            "same_route_avg_speed_mph": round(pair_speed, 1) if pair_speed is not None else None,
+        },
+    }
 
 
 @router.get("/filters")

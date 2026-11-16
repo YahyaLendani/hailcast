@@ -26,6 +26,7 @@ machine learning and deployment-readiness in one runnable system.
 | **Anomalies** | Zone-hours whose demand is unusual (Isolation Forest, z-score fallback). |
 | **Pipeline** | Row counts per tier, validation checks, batch runs, stream failures, retries and scheduled jobs. |
 | **Trips** | Cleaned trip records, filterable by zone, payment type and date. |
+| **Trip map** | One trip on a street map: pickup, drop-off, the likely road route with a cab you can play along it, speed, fare, tip, and how the trip compares to the city and to the same zone-to-zone run. |
 
 ## Quick start
 
@@ -133,6 +134,11 @@ flowchart TD
 - **No future leakage.** Walk-forward `TimeSeriesSplit`, lag and rolling features shifted by at least
   one hour, and the first 24 hours dropped rather than back-filled. A test changes demand from each
   hour onwards, the first included, and asserts that no feature of that hour or earlier moves.
+- **Trip map.** The records hold pickup and drop-off zones, not GPS points (as in real TLC data
+  since 2016), so the map draws the likely road route between the two zone centres, not the path the
+  cab drove, and says so. Routes come from OpenStreetMap data via the OSRM demo server, fetched once
+  by `backend/scripts/build_zone_routes.py` and stored in `backend/app/data/zone_routes.json`, so the
+  running app does not depend on it. Map tiles are from OpenStreetMap.
 - **Monitoring.** `GET /api/v1/health/` reports tier counts, queue state, throughput, retries, failed
   events, job results, recent runs and validation checks; the server logs every retry and failure.
 

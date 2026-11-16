@@ -273,6 +273,46 @@
     .trend.flat { color: var(--ink-3); }
     .stack > div:first-child > .section-head:first-child { border-top: 0; margin-top: 12px; }
 
+    /* ---------- Trip map ---------- */
+    .map-layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 28px; align-items: start; }
+    .trip-pick { max-height: 640px; overflow-y: auto; border-top: 1.5px solid var(--ink); scrollbar-width: thin; }
+    .trip-pick button {
+      display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; text-align: left;
+      font: inherit; font-size: 14px; color: var(--ink); background: none; border: 0; border-bottom: 1px solid var(--rule);
+      padding: 9px 10px; cursor: pointer;
+    }
+    .trip-pick button:hover { background: var(--hover); }
+    .trip-pick button[aria-current="true"] { background: var(--ink); color: var(--on-ink); }
+    .trip-pick button[aria-current="true"] .sub { color: inherit; opacity: .75; }
+    .trip-pick .route { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .trip-pick .sub { grid-column: 1 / -1; color: var(--ink-3); font-size: 13px; }
+    .trip-pick .fare { font-weight: 700; }
+    .map-box { height: 460px; border: 1.5px solid var(--ink); border-radius: 4px; background: var(--surface); z-index: 0; }
+    .map-box .leaflet-control-attribution { font-size: 11px; }
+    .map-box .leaflet-tile-pane { filter: grayscale(.85) contrast(.95); }
+    [data-theme="night"] .map-box .leaflet-tile-pane { filter: grayscale(1) invert(1) brightness(.9) contrast(.9); }
+    .map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin: 12px 0 6px; }
+    .map-bar .readouts { margin-left: 0; }
+    .map-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ink-2); }
+    .map-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 2px solid var(--ink); }
+    .map-legend i.line { width: 18px; height: 0; border: 0; border-top: 4px solid var(--blue); border-radius: 0; vertical-align: 3px; }
+    .cab-icon { background: none; border: 0; }
+    .cab-icon span { display: block; width: 22px; height: 22px; border-radius: 50%; background: var(--yellow); border: 3px solid var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+    .trip-figs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1px solid var(--rule); margin-top: 18px; }
+    .trip-figs > div { padding: 12px 14px 12px 0; border-bottom: 1px solid var(--rule); }
+    .trip-figs dt { font-size: 13px; color: var(--ink-3); }
+    .trip-figs dd { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
+    .trip-figs dd small { font-size: 13px; font-weight: 500; color: var(--ink-3); }
+    .compare-list li { padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+    .compare-list b { font-weight: 700; }
+    .link-btn { font: inherit; font-size: 13px; font-weight: 600; color: var(--blue); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+    @media (max-width: 900px) {
+      .map-layout { grid-template-columns: 1fr; }
+      .trip-pick { max-height: 260px; }
+      .trip-figs { grid-template-columns: repeat(2, 1fr); }
+      .map-box { height: 360px; }
+    }
+
     /* ---------- Motion ---------- */
     html { scroll-behavior: smooth; }
     .panel:not([hidden]) { animation: enter .32s cubic-bezier(.16, 1, .3, 1); }
@@ -382,6 +422,7 @@
       <button class="tab" role="tab" id="tab-anomalies" aria-controls="panel-anomalies" aria-selected="false" tabindex="-1">Anomalies<span class="count num" id="tab-anom-count"></span></button>
       <button class="tab" role="tab" id="tab-quality" aria-controls="panel-quality" aria-selected="false" tabindex="-1">Pipeline</button>
       <button class="tab" role="tab" id="tab-trips" aria-controls="panel-trips" aria-selected="false" tabindex="-1">Trips</button>
+      <button class="tab" role="tab" id="tab-map" aria-controls="panel-map" aria-selected="false" tabindex="-1">Trip map</button>
     </div>
 
     <!-- Where to go -->
@@ -598,9 +639,44 @@
           </form>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Pickup</th><th>From</th><th>To</th><th class="r">Miles</th><th class="r">Minutes</th><th class="r">mph</th><th class="r">Total</th><th>Paid by</th><th>Event ID</th></tr></thead>
-          <tbody id="trips-body"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+          <thead><tr><th>Pickup</th><th>From</th><th>To</th><th class="r">Miles</th><th class="r">Minutes</th><th class="r">mph</th><th class="r">Total</th><th>Paid by</th><th>Event ID</th><th aria-label="Map"></th></tr></thead>
+          <tbody id="trips-body"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- Trip map -->
+    <section class="panel" role="tabpanel" id="panel-map" aria-labelledby="tab-map" hidden>
+      <div class="section-head">
+        <h2>Trip map</h2>
+        <p class="hint">Pick a trip to see where it went, how fast it moved and how it compares. Records hold pickup and drop-off zones, not GPS, so the line is the likely road route between them.</p>
+      </div>
+      <div class="map-layout">
+        <div>
+          <form class="filters" id="map-filters" aria-label="Filter trips on the map">
+            <label>Pickup zone
+              <select id="map-zone"><option value="">All zones</option></select>
+            </label>
+          </form>
+          <div class="trip-pick" id="map-trips" aria-label="Recent trips"><p class="empty">Loading…</p></div>
+        </div>
+        <div>
+          <div class="map-box" id="trip-map" role="region" aria-label="Map of the selected trip"></div>
+          <div class="map-bar">
+            <button class="btn btn-primary" id="map-play" type="button" disabled>Play trip</button>
+            <div class="readouts" aria-live="polite">
+              <span>Trip clock <b class="num" id="map-clock">—</b></span>
+              <span>Covered <b class="num" id="map-covered">—</b></span>
+              <span>Average speed <b class="num" id="map-speed">—</b></span>
+            </div>
+          </div>
+          <div class="map-legend"><span><i style="background:var(--ok)"></i>Pickup</span><span><i style="background:var(--alert)"></i>Drop-off</span><span><i class="line"></i>Likely road route</span><span><i style="background:var(--yellow)"></i>Cab</span></div>
+          <p class="hint" id="map-note" style="margin-top:8px"></p>
+          <h3 id="map-title" style="margin-top:20px">Choose a trip</h3>
+          <dl class="trip-figs" id="map-figs"></dl>
+          <div class="section-head"><h2>How it compares</h2></div>
+          <ul class="compare-list" id="map-compare"><li class="empty">Choose a trip to compare it.</li></ul>
+        </div>
       </div>
     </section>
   </main>
@@ -899,8 +975,9 @@
         <tr><td class="num">${when(t.pickup_datetime)}</td><td>${esc(zoneName(t.pickup_location_id))}</td><td>${esc(zoneName(t.dropoff_location_id))}</td>
         <td class="r num">${n1.format(t.trip_distance)}</td><td class="r num">${t.trip_duration_minutes != null ? n1.format(t.trip_duration_minutes) : '—'}</td>
         <td class="r num">${t.speed_mph != null ? n1.format(t.speed_mph) : '—'}</td><td class="r num">${usd.format(t.total_amount)}</td>
-        <td>${esc(t.payment_type || '—')}</td><td class="mono">${esc((t.event_id || '').slice(0, 12))}</td></tr>`).join('')
-        : `<tr><td colspan="9" class="empty">${narrowed ? 'No trips match these filters. Clear them to see everything.' : 'No cleaned trips yet. Start the replay to ingest some.'}</td></tr>`;
+        <td>${esc(t.payment_type || '—')}</td><td class="mono">${esc((t.event_id || '').slice(0, 12))}</td>
+        <td><button class="link-btn" type="button" data-map-trip="${t.id}">Map</button></td></tr>`).join('')
+        : `<tr><td colspan="10" class="empty">${narrowed ? 'No trips match these filters. Clear them to see everything.' : 'No cleaned trips yet. Start the replay to ingest some.'}</td></tr>`;
     }
 
     async function loadAnomalies() {
@@ -1063,15 +1140,185 @@
       while (feed.children.length > 9) feed.lastElementChild.remove();
     }
 
+    /* ---------- Trip map ---------- */
+    const mapState = { map: null, layer: null, cab: null, selected: null, detail: null, path: null, anim: 0 };
+    let leafletReady = null;
+    function loadLeaflet() {
+      if (window.L) return Promise.resolve();
+      if (leafletReady) return leafletReady;
+      const sheet = document.createElement('link');
+      sheet.rel = 'stylesheet';
+      sheet.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.append(sheet);
+      leafletReady = new Promise((resolve, reject) => {
+        const js = document.createElement('script');
+        js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+        js.onload = resolve;
+        js.onerror = () => { leafletReady = null; reject(new Error('The map library did not load.')); };
+        document.head.append(js);
+      });
+      return leafletReady;
+    }
+    function ensureMap() {
+      if (mapState.map) { mapState.map.invalidateSize(); return; }
+      const map = L.map('trip-map', { zoomControl: true, scrollWheelZoom: false }).setView([40.75, -73.95], 11);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors; routes by OSRM'
+      }).addTo(map);
+      mapState.map = map;
+      mapState.layer = L.layerGroup().addTo(map);
+    }
+    const tripLine = t => `${zoneName(t.pickup_location_id)} → ${zoneName(t.dropoff_location_id)}`;
+    async function loadMapTrips() {
+      const q = new URLSearchParams({ limit: 30 });
+      const zone = $('map-zone').value;
+      if (zone) q.set('location_id', zone);
+      const trips = await api('/analytics/trips?' + q);
+      const box = $('map-trips');
+      if (!trips.length) {
+        box.innerHTML = `<p class="empty">${zone ? 'No trips from this zone yet.' : 'No cleaned trips yet. Start the replay to ingest some.'}</p>`;
+        return;
+      }
+      box.innerHTML = trips.map(t => `
+        <button type="button" data-trip="${t.id}" aria-current="${t.id === mapState.selected}">
+          <span class="route">${esc(tripLine(t))}</span><span class="fare num">${usd.format(t.total_amount)}</span>
+          <span class="sub num">${when(t.pickup_datetime)} · ${n1.format(t.trip_distance)} mi · ${t.speed_mph != null ? n1.format(t.speed_mph) + ' mph' : '—'}</span>
+        </button>`).join('');
+      if (mapState.selected == null) await showTrip(trips[0].id);
+    }
+    function haversine(a, b) {
+      const R = 3958.8, rad = Math.PI / 180;
+      const dLat = (b[0] - a[0]) * rad, dLon = (b[1] - a[1]) * rad;
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(h));
+    }
+    function mins(m) {
+      const secs = Math.round(m * 60);
+      return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    }
+    function setProgress(f) {
+      const d = mapState.detail; if (!d) return;
+      const t = d.trip, total = t.trip_duration_minutes || 0;
+      $('map-clock').textContent = `${mins(total * f)} of ${mins(total)}`;
+      $('map-covered').textContent = `${n1.format(t.trip_distance * f)} of ${n1.format(t.trip_distance)} mi`;
+      const path = mapState.path;
+      if (!path || !mapState.cab) return;
+      const target = path.total * f;
+      let i = 1;
+      while (i < path.cum.length - 1 && path.cum[i] < target) i++;
+      const seg = path.cum[i] - path.cum[i - 1] || 1, k = Math.min(1, Math.max(0, (target - path.cum[i - 1]) / seg));
+      const a = path.pts[i - 1], b = path.pts[i];
+      mapState.cab.setLatLng([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]);
+    }
+    function stopAnim() { cancelAnimationFrame(mapState.anim); mapState.anim = 0; $('map-play').textContent = 'Play trip'; }
+    function playTrip() {
+      if (mapState.anim) { stopAnim(); return; }
+      if (reduce) { setProgress(1); return; }
+      const ms = 8000, t0 = performance.now();
+      $('map-play').textContent = 'Stop';
+      const step = now => {
+        const f = Math.min(1, (now - t0) / ms);
+        setProgress(f);
+        if (f < 1) mapState.anim = requestAnimationFrame(step); else stopAnim();
+      };
+      mapState.anim = requestAnimationFrame(step);
+    }
+    async function showTrip(id) {
+      stopAnim();
+      mapState.selected = id;
+      document.querySelectorAll('#map-trips [data-trip]').forEach(b => b.setAttribute('aria-current', String(Number(b.dataset.trip) === id)));
+      const d = await api(`/analytics/trips/${id}`);
+      if (mapState.selected !== id) return;
+      mapState.detail = d;
+      const t = d.trip;
+      $('map-title').textContent = `${d.pickup.zone_name} → ${d.dropoff.zone_name}, ${when(t.pickup_datetime)}`;
+      $('map-note').textContent = d.route_note;
+      $('map-speed').textContent = t.speed_mph != null ? `${n1.format(t.speed_mph)} mph` : '—';
+      const pct = v => v == null ? '—' : `${n1.format(v)}%`;
+      const fig = (label, value, small) => `<div><dt>${label}</dt><dd class="num">${value}${small ? ` <small>${small}</small>` : ''}</dd></div>`;
+      $('map-figs').innerHTML = [
+        fig('Duration', `${n1.format(t.trip_duration_minutes || 0)} min`),
+        fig('Distance', `${n1.format(t.trip_distance)} mi`),
+        fig('Average speed', t.speed_mph != null ? `${n1.format(t.speed_mph)} mph` : '—'),
+        fig('Passengers', esc(t.passenger_count ?? '—')),
+        fig('Fare', usd.format(t.fare_amount), d.derived.fare_per_mile != null ? `${usd.format(d.derived.fare_per_mile)}/mi` : ''),
+        fig('Tip', usd.format(t.tip_amount || 0), pct(d.derived.tip_percent)),
+        fig('Total paid', usd.format(t.total_amount)),
+        fig('Paid by', esc(t.payment_type || '—'))
+      ].join('');
+      const c = d.compare, items = [];
+      if (c.slower_than_percent != null) items.push(`Faster than <b>${pct(c.slower_than_percent)}</b> of the ${nf.format(c.all_trips)} cleaned trips (city average <b>${n1.format(c.city_avg_speed_mph)} mph</b>).`);
+      if (d.derived.fare_per_mile != null && c.city_avg_fare_per_mile != null) items.push(`Fare per mile <b>${usd.format(d.derived.fare_per_mile)}</b> against a city average of <b>${usd.format(c.city_avg_fare_per_mile)}</b>.`);
+      if (c.same_route_trips > 1) items.push(`<b>${nf.format(c.same_route_trips)}</b> trips made this same zone-to-zone run. On average they took <b>${n1.format(c.same_route_avg_minutes)} min</b>, moved at <b>${n1.format(c.same_route_avg_speed_mph)} mph</b> and cost <b>${usd.format(c.same_route_avg_total)}</b>.`);
+      else items.push('This is the only trip on this zone-to-zone run so far.');
+      if (d.route) items.push(`Driving the likely road route is about <b>${n1.format(d.route.road_miles)} mi</b> and <b>${n1.format(d.route.drive_minutes)} min</b> in free-flowing traffic. The trip record says <b>${n1.format(t.trip_distance)} mi</b> and <b>${n1.format(t.trip_duration_minutes || 0)} min</b>; the sample is synthetic, so the two need not match.`);
+      $('map-compare').innerHTML = items.map(x => `<li>${x}</li>`).join('');
+
+      await loadLeaflet();
+      ensureMap();
+      const layer = mapState.layer;
+      layer.clearLayers();
+      const ink = css('--ink'), A = [d.pickup.lat, d.pickup.lon];
+      const dot = (pt, color, label) => L.circleMarker(pt, { radius: 9, color: ink, weight: 3, fillColor: color, fillOpacity: 1 }).bindTooltip(label).addTo(layer);
+      if (d.route) {
+        const pts = d.route.points;
+        L.polyline(pts, { color: ink, weight: 8, opacity: .35 }).addTo(layer);
+        const line = L.polyline(pts, { color: css('--blue'), weight: 5 }).addTo(layer);
+        const cum = [0];
+        for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + haversine(pts[i - 1], pts[i]));
+        mapState.path = { pts, cum, total: cum[cum.length - 1] };
+        dot(pts[0], css('--ok'), `Pickup: ${d.pickup.zone_name}`);
+        dot(pts[pts.length - 1], css('--alert'), `Drop-off: ${d.dropoff.zone_name}`);
+        mapState.map.fitBounds(line.getBounds(), { padding: [36, 36] });
+      } else {
+        mapState.path = null;
+        L.circle(A, { radius: 600, color: ink, weight: 1.5, fillColor: css('--blue'), fillOpacity: .12, dashArray: '4 6' }).addTo(layer);
+        dot(A, css('--ok'), `Pickup and drop-off: ${d.pickup.zone_name}`);
+        mapState.map.setView(A, 14);
+      }
+      mapState.cab = d.route ? L.marker(d.route.points[0], {
+        icon: L.divIcon({ className: 'cab-icon', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] }),
+        interactive: false, keyboard: false
+      }).addTo(layer) : null;
+      $('map-play').disabled = !d.route;
+      setProgress(0);
+    }
+    $('map-trips').addEventListener('click', e => {
+      const b = e.target.closest('[data-trip]');
+      if (b) guard(showTrip(Number(b.dataset.trip)));
+    });
+    $('map-filters').addEventListener('submit', e => e.preventDefault());
+    $('map-zone').addEventListener('change', () => { mapState.selected = null; guard(loadMapTrips()); });
+    $('map-play').addEventListener('click', playTrip);
+    $('trips-body').addEventListener('click', e => {
+      const b = e.target.closest('[data-map-trip]');
+      if (!b) return;
+      mapState.selected = Number(b.dataset.mapTrip);
+      selectTab('map');
+    });
+    async function loadMapView() {
+      const sel = $('map-zone');
+      if (sel.options.length < 2) {
+        Object.entries(state.zones).sort((a, b) => a[1].localeCompare(b[1]))
+          .forEach(([id, name]) => sel.add(new Option(name, id)));
+      }
+      const wanted = mapState.selected;
+      await loadMapTrips();
+      if (wanted != null && (!mapState.detail || mapState.detail.trip.id !== wanted)) await showTrip(wanted);
+      else if (mapState.map) mapState.map.invalidateSize();
+    }
+
     /* ---------- Tabs ---------- */
-    const TABS = ['dispatch', 'demand', 'forecast', 'anomalies', 'quality', 'trips'];
+    const TABS = ['dispatch', 'demand', 'forecast', 'anomalies', 'quality', 'trips', 'map'];
     const tabLoaders = {
       dispatch: loadOutlook,
       demand: () => Promise.all([loadSeries(), loadZones(), loadFilterOptions()]),
       forecast: () => Promise.all([loadModels(), loadForecast()]),
       anomalies: loadAnomalies,
       quality: () => Promise.resolve(),
-      trips: () => Promise.all([loadTrips(), loadFilterOptions()])
+      trips: () => Promise.all([loadTrips(), loadFilterOptions()]),
+      map: loadMapView
     };
     function selectTab(name, focus) {
       if (!TABS.includes(name)) name = 'dispatch';
@@ -1110,6 +1357,7 @@
       const jobs = [loadSummary()];
       if (state.tab === 'demand') jobs.push(loadSeries(), loadZones());
       if (state.tab === 'trips') jobs.push(loadTrips());
+      if (state.tab === 'map' && !mapState.anim) jobs.push(loadMapTrips());
       if (state.tab === 'dispatch' && Date.now() - outlookAt > 6000) jobs.push(loadOutlook());
       guard(Promise.all(jobs));
     }
