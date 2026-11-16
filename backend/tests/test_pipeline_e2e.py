@@ -6,7 +6,6 @@ from app.core.database import init_db, AsyncSessionLocal
 from app.core.config import settings
 from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand, PipelineRun, DataQualityLog
 from app.services.etl_pipeline import ETLPipeline
-from app.services.data_cleaner import DataCleaner
 from app.ml.train import train_and_evaluate
 from app.services.anomaly_detector import anomaly_detector
 

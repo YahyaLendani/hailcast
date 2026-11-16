@@ -1,8 +1,6 @@
 import asyncio
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -14,10 +12,10 @@ from app.schemas.ml import (
     ModelComparisonResponse, ModelMetrics, AnomalyPoint
 )
 from app.ml.train import train_and_evaluate, forecast_citywide
-from app.ml.models import LightGBMDemandForecaster, BaselineHourlyAverageModel
-from app.ml.feature_engineering import FeatureEngineer
+from app.ml.models import LightGBMDemandForecaster
 from app.ml.tracking import experiment_tracker
 from app.services.anomaly_detector import anomaly_detector
+from app.core.clock import utc_now
 
 router = APIRouter(prefix="/ml", tags=["Machine Learning"])
 
@@ -160,7 +158,7 @@ async def generate_forecast(req: ForecastRequest, db: AsyncSession = Depends(get
     return ForecastResponse(
         model_name="LightGBM_Forecaster",
         horizon_hours=req.horizon_hours,
-        generated_at=datetime.utcnow(),
+        generated_at=utc_now(),
         metrics=lgb,
         forecasts=points,
         history=history

@@ -6,9 +6,10 @@ from typing import Dict, Any, List, Set, Tuple
 from sqlalchemy import select
 from app.core.database import AsyncSessionLocal, write_lock
 from app.core.redis_client import redis_client
-from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand
+from app.models.events import RawTrip, GoldHourlyDemand
 from app.services.data_cleaner import DataCleaner
 from app.services.broadcaster import broadcaster
+from app.core.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class StreamingWorker:
         self.deduplicated_count = 0
         self.failed_count = 0
         self.last_eps = 0.0
-        self._eps_timer = datetime.utcnow()
+        self._eps_timer = utc_now()
         self._eps_count = 0
 
     async def start(self):
@@ -60,7 +61,7 @@ class StreamingWorker:
                     await asyncio.sleep(0.1)
 
                 # Calculate EPS every 3 seconds
-                now = datetime.utcnow()
+                now = utc_now()
                 elapsed = (now - self._eps_timer).total_seconds()
                 if elapsed >= 3.0:
                     self.last_eps = round(self._eps_count / elapsed, 1)
@@ -109,7 +110,7 @@ class StreamingWorker:
         self.dead_letters.append({
             "stream_id": events[0].get("stream_id"),
             "error": f"{type(error).__name__}: {error}",
-            "failed_at": datetime.utcnow().isoformat(),
+            "failed_at": utc_now().isoformat(),
             "payload": events[0].get("payload"),
         })
         logger.error("Event %s dead-lettered: %s", events[0].get("stream_id"), error)
@@ -167,7 +168,7 @@ class StreamingWorker:
                         payment_type=str(raw_data.get("payment_type", "Credit Card")),
                         is_replayed=bool(raw_data.get("is_replayed", True)),
                         source_file="realtime_stream",
-                        ingested_at=datetime.utcnow()
+                        ingested_at=utc_now()
                     )
                     session.add(raw_trip)
 
@@ -206,7 +207,7 @@ class StreamingWorker:
                             gold_record.avg_duration_minutes = round(
                                 (gold_record.avg_duration_minutes * (new_count - 1) + silver_trip.trip_duration_minutes) / new_count, 2
                             )
-                            gold_record.updated_at = datetime.utcnow()
+                            gold_record.updated_at = utc_now()
                         else:
                             gold_record = GoldHourlyDemand(
                                 time_bucket=bucket,
@@ -217,7 +218,7 @@ class StreamingWorker:
                                 avg_fare=silver_trip.fare_amount,
                                 total_revenue=silver_trip.total_amount,
                                 avg_duration_minutes=silver_trip.trip_duration_minutes,
-                                updated_at=datetime.utcnow()
+                                updated_at=utc_now()
                             )
                             session.add(gold_record)
                             gold_cache[bucket_key] = gold_record

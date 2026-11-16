@@ -1,7 +1,8 @@
 import hashlib
 from datetime import datetime
 from typing import Tuple, Dict, Any, List, Optional
-from app.models.events import RawTrip, SilverTrip, DataQualityLog
+from app.models.events import RawTrip, SilverTrip
+from app.core.clock import utc_now
 
 class DataCleaner:
     @staticmethod
@@ -59,6 +60,6 @@ class DataCleaner:
             speed_mph=round(speed_mph, 1),
             payment_type=trip.payment_type,
             is_replayed=trip.is_replayed,
-            processed_at=datetime.utcnow()
+            processed_at=utc_now()
         )
         return True, silver, quality_issues

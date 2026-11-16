@@ -1,6 +1,5 @@
 import json
 import asyncio
-from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from app.core.config import settings

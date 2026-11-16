@@ -1,9 +1,8 @@
 import json
 import logging
-from datetime import datetime
-from pathlib import Path
 from typing import Dict, Any, List
 from app.core.config import settings
+from app.core.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +21,8 @@ class ExperimentTracker:
     ) -> Dict[str, Any]:
         """Log experiment run metrics and metadata."""
         run_record = {
-            "run_id": f"exp-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}-{model_name[:8]}",
-            "timestamp": datetime.utcnow().isoformat(),
+            "run_id": f"exp-{utc_now().strftime('%Y%m%d-%H%M%S')}-{model_name[:8]}",
+            "timestamp": utc_now().isoformat(),
             "model_name": model_name,
             "parameters": params,
             "metrics": metrics,

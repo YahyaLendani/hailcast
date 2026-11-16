@@ -19,7 +19,7 @@ class FeatureEngineer:
 
         # 1. Cyclical Temporal Features
         hour = df["time_bucket"].dt.hour
-        day_of_week = df["time_bucket"].dt.dayofweek
+        day_of_week = df["time_bucket"].dt.day_of_week
         
         df["hour_sin"] = np.sin(2 * np.pi * hour / 24.0)
         df["hour_cos"] = np.cos(2 * np.pi * hour / 24.0)

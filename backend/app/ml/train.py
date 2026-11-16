@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import logging
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error, r2_score
 from app.core.config import settings

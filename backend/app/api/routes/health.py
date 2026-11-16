@@ -1,12 +1,12 @@
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func
 from app.core.database import get_db
 from app.core.redis_client import redis_client
 from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand, PipelineRun, DataQualityLog
 from app.services.streaming_worker import streaming_worker
 from app.services.scheduler import scheduler
+from app.core.clock import utc_now
 
 router = APIRouter(prefix="/health", tags=["Health & Monitoring"])
 
@@ -59,7 +59,7 @@ async def get_pipeline_health(db: AsyncSession = Depends(get_db)):
 
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": utc_now().isoformat(),
         "database": {
             "status": "connected",
             "raw_trips_bronze": raw_cnt,

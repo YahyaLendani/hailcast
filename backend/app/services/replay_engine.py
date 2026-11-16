@@ -1,10 +1,10 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, List, Dict, Any
-from app.core.config import settings
 from app.core.redis_client import redis_client
 from app.services.broadcaster import broadcaster
+from app.core.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +108,7 @@ class ReplayEngine:
                 event_copy = dict(event)
                 # CRITICAL REQUIREMENT: Clearly label simulated real-time events as replayed historical data
                 event_copy["is_replayed"] = True
-                event_copy["replayed_at"] = datetime.utcnow().isoformat()
+                event_copy["replayed_at"] = utc_now().isoformat()
                 
                 self.current_simulated_time = datetime.fromisoformat(
                     str(event_copy["pickup_datetime"]).replace("Z", "")

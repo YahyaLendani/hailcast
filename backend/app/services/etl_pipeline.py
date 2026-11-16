@@ -6,6 +6,7 @@ from sqlalchemy import select, func
 from app.core.database import AsyncSessionLocal, write_lock
 from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand, PipelineRun, DataQualityLog
 from app.services.data_cleaner import DataCleaner
+from app.core.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class ETLPipeline:
             pipeline_run = PipelineRun(
                 run_type="batch_etl",
                 status="running",
-                started_at=datetime.utcnow()
+                started_at=utc_now()
             )
             session.add(pipeline_run)
             await session.flush()
@@ -77,7 +78,7 @@ class ETLPipeline:
                         payment_type=str(item.get("payment_type", "Credit Card")),
                         is_replayed=bool(item.get("is_replayed", True)),
                         source_file=source_name,
-                        ingested_at=datetime.utcnow()
+                        ingested_at=utc_now()
                     )
                     session.add(raw)
                     ingested += 1
@@ -98,7 +99,7 @@ class ETLPipeline:
                                 tested_records=1,
                                 failed_records=1,
                                 details=issues[0]["reason"],
-                                created_at=datetime.utcnow()
+                                created_at=utc_now()
                             )
                             session.add(log_entry)
 
@@ -118,7 +119,7 @@ class ETLPipeline:
             pipeline_run.records_deduplicated = deduplicated
             pipeline_run.records_failed = failed + quality_failures
             pipeline_run.duration_seconds = duration
-            pipeline_run.completed_at = datetime.utcnow()
+            pipeline_run.completed_at = utc_now()
 
             # Record overall data quality test pass log
             q_log = DataQualityLog(
@@ -129,7 +130,7 @@ class ETLPipeline:
                 tested_records=ingested,
                 failed_records=quality_failures,
                 details=f"Ingested {ingested} raw, created {len(silver_candidates)} silver records, {deduplicated} duplicates filtered.",
-                created_at=datetime.utcnow()
+                created_at=utc_now()
             )
             session.add(q_log)
             await session.commit()
@@ -186,7 +187,7 @@ class ETLPipeline:
                     gold_rec.avg_fare = round(float(r.avg_fare or 0.0), 2)
                     gold_rec.total_revenue = round(float(r.total_revenue or 0.0), 2)
                     gold_rec.avg_duration_minutes = round(float(r.avg_duration or 0.0), 2)
-                    gold_rec.updated_at = datetime.utcnow()
+                    gold_rec.updated_at = utc_now()
                 else:
                     new_gold = GoldHourlyDemand(
                         time_bucket=bucket_dt,
@@ -197,7 +198,7 @@ class ETLPipeline:
                         avg_fare=round(float(r.avg_fare or 0.0), 2),
                         total_revenue=round(float(r.total_revenue or 0.0), 2),
                         avg_duration_minutes=round(float(r.avg_duration or 0.0), 2),
-                        updated_at=datetime.utcnow()
+                        updated_at=utc_now()
                     )
                     session.add(new_gold)
 

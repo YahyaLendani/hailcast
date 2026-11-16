@@ -1,6 +1,6 @@
 import numpy as np
 import logging
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 from sklearn.ensemble import IsolationForest
 
 logger = logging.getLogger(__name__)

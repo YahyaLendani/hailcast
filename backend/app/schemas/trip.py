@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 class TripBase(BaseModel):
     pickup_datetime: datetime
@@ -27,8 +27,7 @@ class TripResponse(TripBase):
     ingested_at: Optional[datetime] = None
     processed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BatchIngestRequest(BaseModel):
     trips: List[TripCreate]

@@ -1,8 +1,8 @@
-from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, Boolean, Text, Index
 )
 from app.core.database import Base
+from app.core.clock import utc_now
 
 class RawTrip(Base):
     """Bronze Tier: Raw immutable trip events as ingested from batches or streams."""
@@ -22,7 +22,7 @@ class RawTrip(Base):
     payment_type = Column(String(32), default="Credit Card")
     is_replayed = Column(Boolean, default=True, nullable=False)  # Clearly labels simulated real-time events
     source_file = Column(String(128), default="nyc_yellow_taxi")
-    ingested_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    ingested_at = Column(DateTime, default=utc_now, nullable=False)
 
     __table_args__ = (
         Index("idx_raw_pickup_time_loc", "pickup_datetime", "pickup_location_id"),
@@ -47,7 +47,7 @@ class SilverTrip(Base):
     speed_mph = Column(Float, default=0.0)
     payment_type = Column(String(32), default="Credit Card")
     is_replayed = Column(Boolean, default=True, nullable=False)
-    processed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    processed_at = Column(DateTime, default=utc_now, nullable=False)
 
     __table_args__ = (
         Index("idx_silver_pickup_time_loc", "pickup_datetime", "pickup_location_id"),
@@ -68,7 +68,7 @@ class GoldHourlyDemand(Base):
     avg_duration_minutes = Column(Float, nullable=False, default=0.0)
     anomaly_score = Column(Float, default=0.0)
     is_anomaly = Column(Boolean, default=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, nullable=False)
 
     __table_args__ = (
         Index("idx_gold_bucket_loc", "time_bucket", "location_id", unique=True),
@@ -86,7 +86,7 @@ class PipelineRun(Base):
     records_failed = Column(Integer, default=0)
     duration_seconds = Column(Float, default=0.0)
     error_message = Column(Text, nullable=True)
-    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at = Column(DateTime, default=utc_now, nullable=False)
     completed_at = Column(DateTime, nullable=True)
 
 class DataQualityLog(Base):
@@ -101,5 +101,5 @@ class DataQualityLog(Base):
     tested_records = Column(Integer, default=0)
     failed_records = Column(Integer, default=0)
     details = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 

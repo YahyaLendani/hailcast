@@ -2,8 +2,7 @@ import numpy as np
 import pandas as pd
 import joblib
 from pathlib import Path
-from typing import Dict, Any, Optional
-from sklearn.metrics import mean_absolute_error, root_mean_squared_error, r2_score
+from typing import Dict
 from lightgbm import LGBMRegressor
 
 class BaselinePersistenceModel:

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from app.core.database import get_db
-from app.models.events import RawTrip, SilverTrip, GoldHourlyDemand
+from app.models.events import SilverTrip, GoldHourlyDemand
 from app.schemas.analytics import AnalyticsOverview, HourlyDemandPoint, ZoneDemand
 from app.schemas.trip import TripResponse
 

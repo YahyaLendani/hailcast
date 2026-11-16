@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from typing import List, Dict, Any
+from pydantic import BaseModel, ConfigDict
 
 class HourlyDemandPoint(BaseModel):
     time_bucket: datetime
@@ -12,8 +12,7 @@ class HourlyDemandPoint(BaseModel):
     anomaly_score: float
     is_anomaly: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AnalyticsOverview(BaseModel):
     total_trips: int

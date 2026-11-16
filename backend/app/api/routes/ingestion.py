@@ -1,8 +1,5 @@
 import json
-from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
+from fastapi import APIRouter, Depends, Query
 from app.core.config import settings
 from app.core.redis_client import redis_client
 from app.core.security import require_api_key
