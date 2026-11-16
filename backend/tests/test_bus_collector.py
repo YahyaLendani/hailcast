@@ -118,3 +118,12 @@ def test_live_bus_endpoints():
             assert (await client.get("/api/v1/analytics/live-bus-trips/nope")).status_code == 404
 
     run(scenario())
+
+
+def test_redact_hides_key_raw_and_encoded(monkeypatch):
+    from app.collector import run
+    monkeypatch.setattr(run.settings, "MTA_API_KEY", "abc-123")
+    msg = "GET https://x/feed.json?key=abc-123&version=2 and Location: '/v2.json?key=a%2Fb'"
+    out = run.redact(msg)
+    assert "abc-123" not in out and "a%2Fb" not in out
+    assert "key=***&version=2" in out

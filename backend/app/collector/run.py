@@ -5,6 +5,7 @@ trip. Trips still running when the process stops are lost; the next ones are col
 """
 import asyncio
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -17,6 +18,12 @@ from app.core.database import AsyncSessionLocal, init_db
 from app.models.bus import BusTrip
 
 logger = logging.getLogger("bus_collector")
+
+
+def redact(text: str) -> str:
+    """Hide the API key in a message, raw or URL-encoded, wherever it appears as key=..."""
+    text = re.sub(r"(key=)[^&\s'\"]+", r"\1***", text)
+    return text.replace(settings.MTA_API_KEY, "***") if settings.MTA_API_KEY else text
 
 
 async def store(trips):
@@ -39,6 +46,9 @@ async def prune():
 
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # httpx logs every request URL at INFO, and the MTA key is a query parameter.
+    for name in ("httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.WARNING)
     if not settings.MTA_API_KEY:
         raise SystemExit("MTA_API_KEY is not set; the bus collector has nothing to poll.")
     await init_db()
@@ -57,7 +67,7 @@ async def main():
                     await prune()
             except Exception as exc:  # network trouble or a bad response: try again next poll
                 # httpx puts the request URL, key included, in its messages; keep the key out of logs.
-                logger.warning("poll failed: %s", str(exc).replace(settings.MTA_API_KEY, "***"))
+                logger.warning("poll failed: %s", redact(str(exc)))
             elapsed = asyncio.get_running_loop().time() - started
             await asyncio.sleep(max(1.0, settings.BUS_POLL_SECONDS - elapsed))
 

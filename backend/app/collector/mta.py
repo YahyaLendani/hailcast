@@ -59,6 +59,7 @@ def parse(payload: dict):
 
 
 async def fetch(client, api_key: str) -> dict:
-    resp = await client.get(FEED_URL, params={"key": api_key, "version": "2"}, timeout=60)
+    # The MTA answers this URL with a redirect to its -v2 endpoint, so follow it.
+    resp = await client.get(FEED_URL, params={"key": api_key, "version": "2"}, timeout=60, follow_redirects=True)
     resp.raise_for_status()
     return resp.json()
