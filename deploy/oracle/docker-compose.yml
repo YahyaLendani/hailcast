@@ -1,0 +1,72 @@
+# Hailcast on one Oracle Cloud Always Free VM (Ampere A1, Ubuntu): the app, the live NYC bus
+# collector, Postgres, Redis and Caddy for HTTPS. Setup steps: deploy/oracle/README.md.
+# Secrets come from deploy/oracle/.env, which is never committed.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hailcast
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: hailcast
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hailcast -d hailcast"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ../../backend
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment: &app_env
+      DATABASE_URL: postgresql+asyncpg://hailcast:${POSTGRES_PASSWORD}@postgres:5432/hailcast
+      SYNC_DATABASE_URL: postgresql://hailcast:${POSTGRES_PASSWORD}@postgres:5432/hailcast
+      REDIS_URL: redis://redis:6379/0
+      API_KEY: ${API_KEY:?set API_KEY in .env}
+    volumes:
+      - models:/app/app/ml/saved_models
+
+  collector:
+    build: ../../backend
+    restart: unless-stopped
+    command: python -m app.collector.run
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      <<: *app_env
+      MTA_API_KEY: ${MTA_API_KEY:?set MTA_API_KEY in .env}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  models:
+  caddy_data:
+  caddy_config:

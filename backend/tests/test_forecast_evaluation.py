@@ -10,9 +10,9 @@ from app.ml.models import BaselineHourlyAverageModel, BaselineSeasonalNaiveModel
 def test_hour_of_day_average_uses_the_hour_not_the_overall_mean():
     # Train on a Sunday, predict the Monday after: no (day of week, hour) pair is shared,
     # but every hour of the day is, so each prediction must be that hour's training mean.
-    train = pd.DataFrame({"time_bucket": pd.date_range("2026-11-01", periods=24, freq="h"),
+    train = pd.DataFrame({"time_bucket": pd.date_range("2024-11-03", periods=24, freq="h"),
                           "trip_count": np.arange(24, dtype=float) * 10})
-    test = pd.DataFrame({"time_bucket": pd.date_range("2026-11-02", periods=24, freq="h")})
+    test = pd.DataFrame({"time_bucket": pd.date_range("2024-11-04", periods=24, freq="h")})
     model = BaselineHourlyAverageModel()
     model.fit(train)
     np.testing.assert_array_equal(model.predict(test), train["trip_count"].values)

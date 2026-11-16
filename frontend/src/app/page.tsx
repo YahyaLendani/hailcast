@@ -152,7 +152,7 @@ export default function FlowSightDashboard() {
             <span className="text-slate-200 font-mono font-semibold tabular-nums">
               {replayStatus?.current_simulated_time
                 ? new Date(replayStatus.current_simulated_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : "2026-11-01 14:00"}
+                : "2024-11-03 14:00"}
             </span>
           </div>
         </div>

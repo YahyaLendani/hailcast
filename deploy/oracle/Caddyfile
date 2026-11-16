@@ -1,0 +1,5 @@
+# Caddy gets and renews the HTTPS certificate for SITE_ADDRESS on its own.
+{$SITE_ADDRESS} {
+	encode gzip
+	reverse_proxy backend:8000
+}

@@ -8,6 +8,7 @@ from sqlalchemy import case, desc, func, select
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.zones import ZONES, ZONE_NAMES
+from app.models.bus import BusTrip
 from app.models.events import SilverTrip, GoldHourlyDemand
 from app.schemas.analytics import AnalyticsOverview, HourlyDemandPoint, ZoneDemand
 from app.schemas.trip import TripResponse
@@ -217,6 +218,73 @@ async def get_gps_trip(trip_id: str):
             "sample_avg_kmh": round(sum(speeds) / len(speeds), 1),
             "sample_avg_minutes": round(sum(t["duration_s"] for t in trips) / len(trips) / 60, 1),
             "sample_avg_km": round(sum(t["distance_km"] for t in trips) / len(trips), 2),
+        },
+    }
+
+
+_BUS_SOURCE = {
+    "name": "MTA Bus Time",
+    "publisher": "Metropolitan Transportation Authority",
+    "url": "https://bustime.mta.info/wiki/Developers/Index",
+    "licence": "MTA developer terms",
+    "city": "New York City",
+    "note": "Live bus positions, about one every 30 seconds, recorded around the clock and stitched into "
+            "trips. Points are not snapped to roads. Times are New York local time.",
+}
+_BUS_SUMMARY = (BusTrip.id, BusTrip.start, BusTrip.route, BusTrip.destination, BusTrip.vehicle, BusTrip.duration_s,
+                BusTrip.distance_km, BusTrip.avg_kmh, BusTrip.max_kmh, BusTrip.stopped_s, BusTrip.gps_fixes)
+
+
+def _bus_summary(row) -> dict:
+    d = dict(row._mapping)
+    d["start"] = d["start"].isoformat()
+    return d
+
+
+@router.get("/live-bus-trips")
+async def list_live_bus_trips(route: Optional[str] = Query(None, max_length=32),
+                              limit: int = Query(100, ge=1, le=300), db: AsyncSession = Depends(get_db)):
+    """The most recently finished NYC bus trips, newest first, in the shape of /gps-trips."""
+    q = select(*_BUS_SUMMARY).order_by(desc(BusTrip.end_utc)).limit(limit)
+    if route:
+        q = q.where(BusTrip.route == route.strip().upper())
+    rows = (await db.execute(q)).all()
+    newest = (await db.execute(select(func.max(BusTrip.end_utc)))).scalar()
+    return {
+        "source": _BUS_SOURCE,
+        "newest_end_utc": newest.isoformat() if newest else None,
+        "trips": [_bus_summary(r) for r in rows],
+    }
+
+
+@router.get("/live-bus-trips/{trip_id}")
+async def get_live_bus_trip(trip_id: str, db: AsyncSession = Depends(get_db)):
+    """One bus trip with its timed path and speeds, compared with all stored trips and its own route."""
+    trip = await db.get(BusTrip, trip_id)
+    if trip is None:
+        raise HTTPException(status_code=404, detail="Bus trip not found")
+    stats = lambda *where: select(  # noqa: E731
+        func.count(), func.avg(BusTrip.avg_kmh), func.avg(BusTrip.duration_s), func.avg(BusTrip.distance_km),
+        func.sum(case((BusTrip.avg_kmh < trip.avg_kmh, 1), else_=0)),
+    ).where(*where)
+    n, kmh, secs, km, slower = (await db.execute(stats())).one()
+    rn, rkmh, rsecs, _, rslower = (await db.execute(stats(BusTrip.route == trip.route))).one()
+    return {
+        **{c.key: getattr(trip, c.key) for c in _BUS_SUMMARY},
+        "start": trip.start.isoformat(),
+        "snapped_to_roads": 0,
+        "points": trip.points,
+        "speeds": trip.speeds,
+        "compare": {
+            "sample_trips": n,
+            "slower_than_percent": round(100 * (slower or 0) / n, 1),
+            "sample_avg_kmh": round(kmh, 1),
+            "sample_avg_minutes": round(secs / 60, 1),
+            "sample_avg_km": round(km, 2),
+            "route_trips": rn,
+            "route_slower_than_percent": round(100 * (rslower or 0) / rn, 1),
+            "route_avg_kmh": round(rkmh, 1),
+            "route_avg_minutes": round(rsecs / 60, 1),
         },
     }
 

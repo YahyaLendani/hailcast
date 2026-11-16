@@ -25,7 +25,7 @@ than the strongest simple baseline?
 
 - **Data:** `backend/app/data/sample_trips.json` as committed (seed 42), loaded through the batch
   pipeline as `generate_reports.py` does now. The series is city-wide trips per hour, with the
-  newest hour dropped (167 hours, 2026-11-01 00:00 to 2026-11-07 22:00).
+  newest hour dropped (167 hours, 2024-11-03 00:00 to 2024-11-09 22:00; the sample was shifted 104 weeks earlier on 2026-11-16, same trips and weekdays).
 - **No back-filled features:** `bfill()` is removed from feature building. The first 24 hours are
   dropped, because they have no complete `lag_24h` or 24-hour rolling mean. That leaves 143 hours.
   No other feature changes.

@@ -661,6 +661,7 @@
         <span class="seg" role="radiogroup" aria-label="Trip data">
           <label><input type="radio" name="map-source" value="gps" checked><span>Real GPS, Porto</span></label>
           <label><input type="radio" name="map-source" value="nyc"><span>Replayed sample, NYC</span></label>
+          <label><input type="radio" name="map-source" value="bus"><span>Live buses, NYC</span></label>
         </span>
         <span class="seg" role="radiogroup" aria-label="Playback speed">
           <label><input type="radio" name="map-rate" value="10"><span>10×</span></label>
@@ -1161,14 +1162,17 @@
     }
 
     /* ---------- Trip map ---------- */
-    // Two sources. "gps": real Porto trips, a GPS fix every 15 s, snapped to roads, every point timed.
+    // Three sources. "gps": real Porto trips, a GPS fix every 15 s, snapped to roads, every point timed.
+    // "bus": NYC bus trips recorded live from MTA Bus Time, a fix about every 30 s, timed the same way.
     // "nyc": the replayed sample, which only records zones, so the route is an estimate and the
     // cab moves at the trip's average speed.
     const mapState = { source: 'gps', rate: 30, map: null, layer: null, cab: null, selected: null, detail: null,
-                       path: null, t: 0, anim: 0, gpsList: null, gpsSource: null, speedChart: null };
+                       path: null, t: 0, anim: 0, gpsList: null, gpsSource: null, busSource: null, speedChart: null };
+    const timed = () => mapState.source !== 'nyc';  // sources whose path has a real time for every point
     const kmFmt = v => `${n1.format(v)} km`;
     const INTRO = {
       gps: 'Real taxi trips from Porto, Portugal, with a GPS fix every 15 seconds. Each trip is snapped to the roads and keeps its real timing, so the cab speeds up, slows down and stops where the taxi did.',
+      bus: 'NYC bus trips recorded live from MTA Bus Time. A collector stores each bus position, about one every 30 seconds, and a trip appears here a few minutes after it ends. The bus moves at its recorded speed; the line joins its positions and is not snapped to roads.',
       nyc: 'Trips from the replayed NYC sample. These records hold pickup and drop-off zones, not GPS, so the line is the likely road route between the zones and the cab moves at the trip\u2019s average speed.'
     };
     let leafletReady = null;
@@ -1248,7 +1252,25 @@
         </button>`).join('');
       if (mapState.selected == null) await showTrip(trips[0].id);
     }
-    const loadMapTrips = () => mapState.source === 'gps' ? loadGpsList() : loadNycList();
+    async function loadBusList() {
+      const data = await api('/analytics/live-bus-trips');
+      if (mapState.source !== 'bus') return;
+      mapState.busSource = data.source;
+      const trips = data.trips;
+      $('map-trips').innerHTML = trips.length ? trips.map(t => `
+        <button type="button" data-trip="${esc(t.id)}" aria-current="${t.id === mapState.selected}">
+          <span class="route">${esc(t.route)}${t.destination ? ' to ' + esc(t.destination) : ''}</span><span class="fare num">${clock(t.duration_s)} min</span>
+          <span class="sub num">${esc(localStart(t.start))} · ${kmFmt(t.distance_km)} · average ${n1.format(t.avg_kmh)} km/h</span>
+        </button>`).join('') : '<p class="empty">No live bus trips yet. The collector stores each trip a few minutes after it ends.</p>';
+      if (trips.length && mapState.selected == null) await showTrip(trips[0].id);
+    }
+    const loadMapTrips = () => ({ gps: loadGpsList, bus: loadBusList, nyc: loadNycList })[mapState.source]();
+    // Speed of the leg the vehicle is on at time t; legs are [start seconds, km/h].
+    function speedAt(speeds, t) {
+      let lo = 0, hi = speeds.length - 1;
+      while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (speeds[mid][0] <= t) lo = mid; else hi = mid - 1; }
+      return speeds[lo];
+    }
 
     /* Playback: the path is a list of [lat, lon, seconds]; the cab is where the taxi was at time t. */
     function positionAt(t) {
@@ -1268,10 +1290,10 @@
       if (mapState.cab) mapState.cab.setLatLng(at);
       $('map-clock').textContent = `${clock(t)} of ${clock(path.duration)}`;
       $('map-scrub').value = Math.round(1000 * t / path.duration);
-      if (mapState.source === 'gps') {
+      if (timed()) {
         const done = (path.cum[i - 1] || 0) + ((path.cum[i] || 0) - (path.cum[i - 1] || 0)) * (k || 0);
         $('map-covered').textContent = `${n1.format(done)} of ${kmFmt(path.cum[path.cum.length - 1])}`;
-        const leg = d.speeds[Math.min(d.speeds.length - 1, Math.floor(t / 15))];
+        const leg = speedAt(d.speeds, t);
         $('map-speed').textContent = leg ? `${nf.format(leg[1])} km/h` : '—';
         if (mapState.speedChart) { mapState.speedChart.$cursor = t / 60; mapState.speedChart.draw(); }
       } else {
@@ -1309,7 +1331,8 @@
       if (mapState.speedChart) { mapState.speedChart.destroy(); mapState.speedChart = null; }
       box.hidden = !d.speeds;
       if (!d.speeds) return;
-      const data = d.speeds.map(([t, v]) => ({ x: (t + 7.5) / 60, y: v }));
+      // Each leg is plotted at its midpoint, in minutes.
+      const data = d.speeds.map(([t, v], i) => ({ x: (t + (d.speeds[i + 1] || [d.duration_s])[0]) / 120, y: v }));
       mapState.speedChart = new Chart($('map-speed-chart'), {
         type: 'line',
         data: { datasets: [{ data, borderColor: css('--blue'), backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: .3 }] },
@@ -1356,6 +1379,31 @@
       const src = mapState.gpsSource;
       $('map-source-note').innerHTML = src ? `Data: <a href="${esc(src.url)}">${esc(src.name)}</a>, ${esc(src.publisher)}, ${esc(src.licence)}. Roads: OpenStreetMap, matched with OSRM.` : '';
     }
+    function describeBus(d) {
+      $('map-title').textContent = `${d.route}${d.destination ? ' to ' + d.destination : ''}, ${localStart(d.start)}, ${clock(d.duration_s)} min`;
+      $('map-note').textContent = `${d.gps_fixes} positions from MTA Bus Time, about one every ${Math.round(d.duration_s / Math.max(1, d.gps_fixes - 1))} seconds. The bus moves at the recorded speed between them; the line joins the positions and is not snapped to roads.`;
+      $('map-speed-label').textContent = 'Speed now';
+      $('map-line-label').textContent = 'Path driven';
+      $('map-figs').innerHTML = [
+        fig('Duration', `${clock(d.duration_s)} min`),
+        fig('Distance', kmFmt(d.distance_km)),
+        fig('Average speed', `${n1.format(d.avg_kmh)} km/h`),
+        fig('Top speed', `${nf.format(d.max_kmh)} km/h`),
+        fig('Stopped', `${clock(d.stopped_s)} min`, pct(100 * d.stopped_s / d.duration_s)),
+        fig('Started', esc(localStart(d.start))),
+        fig('Route', esc(d.route)),
+        fig('Bus', esc(d.vehicle))
+      ].join('');
+      const c = d.compare, items = [
+        `Faster on average than <b>${pct(c.slower_than_percent)}</b> of the ${nf.format(c.sample_trips)} bus trips stored (average <b>${n1.format(c.sample_avg_kmh)} km/h</b>).`
+      ];
+      if (c.route_trips > 1) items.push(`<b>${nf.format(c.route_trips)}</b> trips on the ${esc(d.route)} are stored. They average <b>${n1.format(c.route_avg_kmh)} km/h</b> and <b>${n1.format(c.route_avg_minutes)} min</b>; this one was faster than <b>${pct(c.route_slower_than_percent)}</b> of them.`);
+      else items.push(`This is the only stored trip on the ${esc(d.route)} so far.`);
+      items.push(`It spent <b>${clock(d.stopped_s)} min</b> stopped or crawling below 3 km/h, at stops and in traffic.`);
+      $('map-compare').innerHTML = items.map(x => `<li>${x}</li>`).join('');
+      const src = mapState.busSource;
+      $('map-source-note').innerHTML = src ? `Data: <a href="${esc(src.url)}">${esc(src.name)}</a>, ${esc(src.publisher)}, ${esc(src.licence)}. Map: OpenStreetMap.` : '';
+    }
     function describeNyc(d) {
       const t = d.trip;
       $('map-title').textContent = `${d.pickup.zone_name} → ${d.dropoff.zone_name}, ${when(t.pickup_datetime)}`;
@@ -1387,10 +1435,11 @@
       mapState.selected = id;
       setCurrent(id);
       const source = mapState.source;
-      const d = await api(source === 'gps' ? `/analytics/gps-trips/${encodeURIComponent(id)}` : `/analytics/trips/${id}`);
+      const d = await api(source === 'gps' ? `/analytics/gps-trips/${encodeURIComponent(id)}`
+        : source === 'bus' ? `/analytics/live-bus-trips/${encodeURIComponent(id)}` : `/analytics/trips/${id}`);
       if (mapState.selected !== id || mapState.source !== source) return;
       mapState.detail = d;
-      if (source === 'gps') describeGps(d); else describeNyc(d);
+      ({ gps: describeGps, bus: describeBus, nyc: describeNyc })[source](d);
 
       await loadLeaflet();
       ensureMap();
@@ -1400,7 +1449,7 @@
       const dot = (pt, color, label) => L.circleMarker(pt, { radius: 9, color: ink, weight: 3, fillColor: color, fillOpacity: 1 }).bindTooltip(label).addTo(layer);
 
       let pts = null;
-      if (source === 'gps') {
+      if (source !== 'nyc') {
         pts = d.points;
       } else if (d.route) {
         // Spread the recorded duration along the estimated route at a constant speed.
@@ -1416,8 +1465,8 @@
         const latlngs = pts.map(p => [p[0], p[1]]);
         L.polyline(latlngs, { color: ink, weight: 8, opacity: .35 }).addTo(layer);
         const line = L.polyline(latlngs, { color: css('--blue'), weight: 5 }).addTo(layer);
-        dot(latlngs[0], css('--ok'), 'Pickup');
-        dot(latlngs[latlngs.length - 1], css('--alert'), 'Drop-off');
+        dot(latlngs[0], css('--ok'), source === 'bus' ? 'Start' : 'Pickup');
+        dot(latlngs[latlngs.length - 1], css('--alert'), source === 'bus' ? 'End' : 'Drop-off');
         mapState.cab = L.marker(latlngs[0], {
           icon: L.divIcon({ className: 'cab-icon', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] }),
           interactive: false, keyboard: false
@@ -1433,7 +1482,7 @@
         ['map-clock', 'map-covered'].forEach(k => { $(k).textContent = '—'; });
       }
       $('map-play').disabled = $('map-scrub').disabled = !mapState.path;
-      drawSpeedChart(source === 'gps' ? d : {});
+      drawSpeedChart(source !== 'nyc' ? d : {});
       mapState.t = 0;
       setTime(0);
     }
@@ -1442,7 +1491,7 @@
     $('map-trips').addEventListener('click', e => {
       const b = e.target.closest('[data-trip]');
       if (!b) return;
-      guard(showTrip(mapState.source === 'gps' ? b.dataset.trip : Number(b.dataset.trip)));
+      guard(showTrip(mapState.source === 'nyc' ? Number(b.dataset.trip) : b.dataset.trip));
     });
     $('map-filters').addEventListener('submit', e => e.preventDefault());
     $('map-zone').addEventListener('change', () => { mapState.selected = null; guard(loadNycList()); });

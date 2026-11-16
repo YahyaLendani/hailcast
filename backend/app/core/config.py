@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     # shared by all callers. A valid X-API-Key skips the wait; 0 turns it off.
     EXPENSIVE_ACTION_COOLDOWN_SECONDS: float = 300.0
 
+    # Live NYC bus collector (python -m app.collector.run). Without MTA_API_KEY it does not start.
+    MTA_API_KEY: str = ""
+    BUS_POLL_SECONDS: float = 30.0  # the MTA asks for no more than one request per 30 seconds
+    BUS_RETENTION_HOURS: float = 24.0
+
     # Browser origins allowed to call the API from another site. The served dashboard
     # is same-origin and needs none; this default lets the local Next.js prototype
     # in frontend/ reach a local backend.

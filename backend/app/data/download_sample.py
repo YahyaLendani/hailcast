@@ -25,7 +25,7 @@ def generate_sample_dataset(output_path: Path, days: int = 7, base_trips_per_day
     random.seed(42)
     np.random.seed(42)
     
-    start_date = datetime(2026, 11, 1, 0, 0, 0)
+    start_date = datetime(2024, 11, 3, 0, 0, 0)
     records = []
     
     zone_ids = list(ZONES.keys())
