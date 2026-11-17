@@ -2,7 +2,7 @@
 
 **Real-time data engineering and predictive analytics for taxi demand.**
 
-**Live demo: <https://hailcast.onrender.com>** (free hosting: if it has been idle, the first load can take up to a minute)
+**Live demo: <https://hailcast.duckdns.org>**
 
 Hailcast ingests trip records in batch and as a replayed event stream, cleans them through
 Bronze, Silver and Gold tables, forecasts hourly demand, flags unusual hours, and shows all of it
@@ -180,32 +180,27 @@ Honest state of each item. "Partial" means some of it exists but it is not what 
 | Infra | Scheduled jobs | Done (in-process scheduler). |
 | Infra | Monitoring dashboards and logs | Done at demo level: health endpoint, Pipeline view, logs. No Prometheus or Grafana. |
 | Infra | Docker and CI | Done. GitHub Actions runs lint and pytest, then builds the backend image, starts it and checks it serves. `docker compose up` with PostgreSQL and Redis is not covered by CI. |
-| Infra | Deployment, public demo URL | Done: <https://hailcast.onrender.com> on Render's free plan, deployed from `render.yaml`. |
+| Infra | Deployment, public demo URL | Done: <https://hailcast.duckdns.org> on one Oracle Cloud Always Free VM (Docker Compose with PostgreSQL, Redis, the live bus collector and Caddy for HTTPS), set up from `deploy/oracle/`. |
 
 ## Put it online
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/YahyaLendani/hailcast)
-
-The repository includes `render.yaml`, a blueprint for one free [Render](https://render.com) web
-service that runs the API and the dashboard from `backend/Dockerfile`.
-
-1. Press the button above (or in Render choose **New, Blueprint** and pick the repository) and apply.
-2. Render builds the image and gives the app a public `https://<name>.onrender.com` address.
-3. In GitHub, set the repository variable `DEMO_URL` to that address (Settings, Secrets and
-   variables, Actions, Variables). The `Keep demo awake` workflow then pings it every 10 minutes so
-   visitors do not wait for the free plan to wake up.
+The live demo runs on one Oracle Cloud Always Free VM (Ampere A1, Ubuntu). `deploy/oracle/`
+holds everything: a Docker Compose file with PostgreSQL, Redis, the API and dashboard, the live
+NYC bus collector and Caddy, which gets and renews the HTTPS certificate; a one-time `setup.sh`;
+and step-by-step instructions in [`deploy/oracle/README.md`](deploy/oracle/README.md).
 
 Things to know:
 
-- **Uploads are locked on the hosted demo.** The blueprint generates an `API_KEY`; the `/ingest`
+- **Uploads are locked on the hosted demo.** `setup.sh` generates an `API_KEY`; the `/ingest`
   endpoints then need it in an `X-API-Key` header. Visitors can still run the replay, filter, retrain
   and run the scheduled job, which only ever touch the built-in sample. Locally, with no `API_KEY`
   set, everything is open.
-- **Data is reseeded on every start**, so nothing a visitor does persists across restarts.
+- **Live buses need an MTA Bus Time key** (free, from the MTA) in `deploy/oracle/.env`. Finished
+  bus trips are kept for 24 hours.
 - **The image is tested in CI.** Every push builds `backend/Dockerfile`, starts the container and
   checks the dashboard, the API and the upload lock.
-- GitHub's scheduler is best effort, and pauses after 60 days without repository activity, so an
-  occasional slow first load is still possible.
+- The `Keep demo awake` workflow requests the site every 10 minutes when the repository variable
+  `DEMO_URL` is set, and fails if it is down.
 
 ## Docker
 

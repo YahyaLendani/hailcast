@@ -1,10 +1,9 @@
 name: Keep demo awake
 
-# Free hosting plans put the app to sleep after about 15 idle minutes, which makes
-# the first visit slow. This pings the hosted demo so it stays warm.
-# It does nothing until the repository variable DEMO_URL is set
-# (Settings, Secrets and variables, Actions, Variables), for example
-# https://hailcast.onrender.com
+# Requests the hosted demo every 10 minutes and fails if it does not answer, so an
+# outage shows up as a failed run. It does nothing until the repository variable
+# DEMO_URL is set (Settings, Secrets and variables, Actions, Variables), for example
+# https://hailcast.duckdns.org
 
 on:
   schedule:

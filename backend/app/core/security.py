@@ -38,7 +38,7 @@ class Cooldown:
     """At most one run of each named action per window, shared by every caller.
 
     The window is global, not per client: the point is to cap the server's work, and
-    client addresses behind Render's proxy are easy to vary. The check and the update
+    client addresses behind a proxy are easy to vary. The check and the update
     run with no `await` between them, so concurrent requests cannot both pass.
     """
 
