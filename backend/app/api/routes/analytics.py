@@ -322,7 +322,8 @@ async def get_demand_series(
         GoldHourlyDemand.time_bucket,
         func.sum(GoldHourlyDemand.trip_count),
         func.sum(GoldHourlyDemand.total_revenue),
-        func.sum(func.coalesce(GoldHourlyDemand.is_anomaly, False)),
+        # Count with CASE: PostgreSQL has no SUM over booleans (SQLite treats them as 0/1).
+        func.sum(case((GoldHourlyDemand.is_anomaly.is_(True), 1), else_=0)),
     )
     if location_id is not None:
         query = query.where(GoldHourlyDemand.location_id == location_id)
